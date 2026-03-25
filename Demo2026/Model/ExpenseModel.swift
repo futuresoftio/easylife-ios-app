@@ -22,10 +22,23 @@ struct ExpenseItem: Identifiable, Codable {
     let title: String
     let amount: Double
 
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case amount
+    }
+
     init(id: UUID = UUID(), title: String, amount: Double) {
         self.id = id
         self.title = title
         self.amount = amount
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        title = try container.decode(String.self, forKey: .title)
+        amount = try container.decode(Double.self, forKey: .amount)
     }
 }
 
@@ -57,6 +70,10 @@ enum ExpenseStore {
     static func loadCategories() -> [ExpenseCategory] {
         seedInitialDataIfNeeded()
         return categories(from: fetchStoredExpenses())
+    }
+
+    static func preloadInitialData() {
+        seedInitialDataIfNeeded()
     }
 
     static func addReceiptExpenses(_ receiptExpenses: [ReceiptExpense]) throws {
@@ -158,7 +175,7 @@ enum ExpenseStore {
         storedExpense.setValue(id, forKey: "id")
         storedExpense.setValue(title, forKey: "title")
         storedExpense.setValue(amount, forKey: "amount")
-        storedExpense.setValue(category, forKey: "category")
+        storedExpense.setValue(categoryObject(named: category), forKey: "category")
         storedExpense.setValue(createdAt, forKey: "createdAt")
     }
 
@@ -199,21 +216,40 @@ enum ExpenseStore {
     }
 
     private static func expenseCategory(for expense: NSManagedObject) -> String {
-        expense.value(forKey: "category") as? String ?? "Other"
+        let category = expense.value(forKey: "category") as? NSManagedObject
+        return category?.value(forKey: "name") as? String ?? "Other"
     }
 
     private static func expenseItem(from expense: NSManagedObject) -> ExpenseItem? {
         guard let id = expense.value(forKey: "id") as? UUID,
-              let title = expense.value(forKey: "title") as? String,
-              let category = expense.value(forKey: "category") as? String,
-              let createdAt = expense.value(forKey: "createdAt") as? Date else {
+              let title = expense.value(forKey: "title") as? String else {
             return nil
         }
 
         let amount = expense.value(forKey: "amount") as? Double ?? 0
-        _ = category
-        _ = createdAt
         return ExpenseItem(id: id, title: title, amount: amount)
+    }
+
+    private static func categoryObject(named name: String) -> NSManagedObject? {
+        let request = categoryFetchRequest()
+        request.fetchLimit = 1
+        request.predicate = NSPredicate(format: "name == %@", name)
+
+        if let existingCategory = try? viewContext.fetch(request).first {
+            return existingCategory
+        }
+
+        guard let entity = NSEntityDescription.entity(forEntityName: "Category", in: viewContext) else {
+            return nil
+        }
+
+        let category = NSManagedObject(entity: entity, insertInto: viewContext)
+        category.setValue(name, forKey: "name")
+        return category
+    }
+
+    private static func categoryFetchRequest() -> NSFetchRequest<NSManagedObject> {
+        NSFetchRequest<NSManagedObject>(entityName: "Category")
     }
 }
 

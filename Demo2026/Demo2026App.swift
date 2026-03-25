@@ -9,6 +9,10 @@ import SwiftUI
 
 @main
 struct Demo2026App: App {
+    init() {
+        ExpenseStore.preloadInitialData()
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
