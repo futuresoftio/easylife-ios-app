@@ -77,7 +77,7 @@ struct HomeView: View {
                 .padding()
             }
             .task {
-                categories = ExpenseStore.loadCategories()
+                refreshCategories()
             }
             .navigationTitle("Easy Life")
             .toolbar {
@@ -148,29 +148,24 @@ struct HomeView: View {
                 return
             }
 
-            let updatedCategories = ExpenseStore.merge(current: categories, with: receiptExpenses)
-            categories = updatedCategories
-            ExpenseStore.saveCategories(updatedCategories)
+            try ExpenseStore.addReceiptExpenses(receiptExpenses)
+            refreshCategories()
         } catch {
             alertMessage = "Failed to analyze the scanned receipt."
         }
     }
 
-    private func deleteExpense(_ expense: ExpenseItem, from category: ExpenseCategory) {
-        categories = categories.compactMap { currentCategory in
-            guard currentCategory.id == category.id else {
-                return currentCategory
-            }
-
-            let remainingExpenses = currentCategory.expenses.filter { $0.id != expense.id }
-            guard !remainingExpenses.isEmpty else {
-                return nil
-            }
-
-            return ExpenseCategory(name: currentCategory.name, expenses: remainingExpenses)
+    private func deleteExpense(_ expense: ExpenseItem, from _: ExpenseCategory) {
+        do {
+            try ExpenseStore.deleteExpense(id: expense.id)
+            refreshCategories()
+        } catch {
+            alertMessage = "Failed to delete the expense."
         }
+    }
 
-        ExpenseStore.saveCategories(categories)
+    private func refreshCategories() {
+        categories = ExpenseStore.loadCategories()
     }
 }
 

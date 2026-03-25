@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import CoreData
 import UIKit
 import Vision
 
@@ -17,10 +18,15 @@ struct ExpenseCategory: Identifiable, Codable {
 }
 
 struct ExpenseItem: Identifiable, Codable {
+    let id: UUID
     let title: String
     let amount: Double
 
-    var id: String { title }
+    init(id: UUID = UUID(), title: String, amount: Double) {
+        self.id = id
+        self.title = title
+        self.amount = amount
+    }
 }
 
 struct ReceiptExpense {
@@ -34,53 +40,139 @@ private struct ReceiptContext {
 }
 
 enum ExpenseStore {
-    private static let savedExpensesKey = "saved_expense_categories_json"
+    private static let legacySavedExpensesKey = "saved_expense_categories_json"
+    private static let persistentContainer: NSPersistentContainer = {
+        let container = NSPersistentContainer(name: "ExpenseDataModel")
+        container.loadPersistentStores { _, error in
+            if let error {
+                fatalError("Failed to load persistent stores: \(error.localizedDescription)")
+            }
+        }
+        container.viewContext.automaticallyMergesChangesFromParent = true
+        container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+        return container
+    }()
+    private static let viewContext = persistentContainer.viewContext
 
     static func loadCategories() -> [ExpenseCategory] {
-        if let savedCategories = loadSavedCategories(), !savedCategories.isEmpty {
-            return savedCategories
-        }
-
-        return loadBundledCategories()
+        seedInitialDataIfNeeded()
+        return categories(from: fetchStoredExpenses())
     }
 
-    static func saveCategories(_ categories: [ExpenseCategory]) {
-        guard let data = try? JSONEncoder().encode(categories) else {
-            return
-        }
-
-        UserDefaults.standard.set(data, forKey: savedExpensesKey)
-    }
-
-    static func merge(current: [ExpenseCategory], with receiptExpenses: [ReceiptExpense]) -> [ExpenseCategory] {
-        var groupedExpenses = Dictionary(uniqueKeysWithValues: current.map { ($0.name, $0.expenses) })
-        var categoryOrder = current.map(\.name)
+    static func addReceiptExpenses(_ receiptExpenses: [ReceiptExpense]) throws {
+        seedInitialDataIfNeeded()
 
         for receiptExpense in receiptExpenses {
-            if groupedExpenses[receiptExpense.category] == nil {
-                groupedExpenses[receiptExpense.category] = []
-                categoryOrder.append(receiptExpense.category)
-            }
+            insertExpense(
+                title: receiptExpense.item.title,
+                amount: receiptExpense.item.amount,
+                category: receiptExpense.category
+            )
+        }
 
-            groupedExpenses[receiptExpense.category, default: []].append(receiptExpense.item)
+        try saveContext()
+    }
+
+    static func deleteExpense(id: UUID) throws {
+        let request = storedExpenseFetchRequest()
+        request.fetchLimit = 1
+        request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+
+        if let expense = try viewContext.fetch(request).first {
+            viewContext.delete(expense)
+            try saveContext()
+        }
+    }
+
+    static func categories(from expenses: [NSManagedObject]) -> [ExpenseCategory] {
+        let groupedExpenses = Dictionary(grouping: expenses, by: { expenseCategory(for: $0) })
+        let categoryOrder = expenses.map { expenseCategory(for: $0) }.reduce(into: [String]()) { partialResult, category in
+            if !partialResult.contains(category) {
+                partialResult.append(category)
+            }
         }
 
         return categoryOrder.compactMap { categoryName in
-            guard let expenses = groupedExpenses[categoryName] else {
+            guard let storedExpenses = groupedExpenses[categoryName] else {
                 return nil
             }
 
-            return ExpenseCategory(name: categoryName, expenses: expenses)
+            return ExpenseCategory(
+                name: categoryName,
+                expenses: storedExpenses.compactMap(expenseItem(from:))
+            )
         }
     }
 
-    private static func loadSavedCategories() -> [ExpenseCategory]? {
-        guard let data = UserDefaults.standard.data(forKey: savedExpensesKey),
-              let categories = try? JSONDecoder().decode([ExpenseCategory].self, from: data) else {
-            return nil
+    private static func fetchStoredExpenses() -> [NSManagedObject] {
+        let request = storedExpenseFetchRequest()
+        request.sortDescriptors = [
+            NSSortDescriptor(key: "createdAt", ascending: true)
+        ]
+
+        return (try? viewContext.fetch(request)) ?? []
+    }
+
+    private static func seedInitialDataIfNeeded() {
+        let request = storedExpenseFetchRequest()
+        request.fetchLimit = 1
+
+        let count = (try? viewContext.count(for: request)) ?? 0
+        guard count == 0 else {
+            return
         }
 
-        return categories
+        let categoriesToSeed = loadLegacySavedCategories().flatMap { categories in
+            categories.isEmpty ? nil : categories
+        } ?? loadBundledCategories()
+        let now = Date()
+
+        for (categoryIndex, category) in categoriesToSeed.enumerated() {
+            for (expenseIndex, expense) in category.expenses.enumerated() {
+                insertExpense(
+                    id: expense.id,
+                    title: expense.title,
+                    amount: expense.amount,
+                    category: category.name,
+                    createdAt: now.addingTimeInterval(Double(categoryIndex * 100 + expenseIndex))
+                )
+            }
+        }
+
+        try? saveContext()
+        UserDefaults.standard.removeObject(forKey: legacySavedExpensesKey)
+    }
+
+    private static func insertExpense(
+        id: UUID = UUID(),
+        title: String,
+        amount: Double,
+        category: String,
+        createdAt: Date = Date()
+    ) {
+        guard let entity = NSEntityDescription.entity(forEntityName: "StoredExpense", in: viewContext) else {
+            return
+        }
+
+        let storedExpense = NSManagedObject(entity: entity, insertInto: viewContext)
+        storedExpense.setValue(id, forKey: "id")
+        storedExpense.setValue(title, forKey: "title")
+        storedExpense.setValue(amount, forKey: "amount")
+        storedExpense.setValue(category, forKey: "category")
+        storedExpense.setValue(createdAt, forKey: "createdAt")
+    }
+
+    private static func saveContext() throws {
+        guard viewContext.hasChanges else {
+            return
+        }
+
+        do {
+            try viewContext.save()
+        } catch {
+            viewContext.rollback()
+            throw error
+        }
     }
 
     private static func loadBundledCategories() -> [ExpenseCategory] {
@@ -91,6 +183,37 @@ enum ExpenseStore {
         }
 
         return categories
+    }
+
+    private static func loadLegacySavedCategories() -> [ExpenseCategory]? {
+        guard let data = UserDefaults.standard.data(forKey: legacySavedExpensesKey),
+              let categories = try? JSONDecoder().decode([ExpenseCategory].self, from: data) else {
+            return nil
+        }
+
+        return categories
+    }
+
+    private static func storedExpenseFetchRequest() -> NSFetchRequest<NSManagedObject> {
+        NSFetchRequest<NSManagedObject>(entityName: "StoredExpense")
+    }
+
+    private static func expenseCategory(for expense: NSManagedObject) -> String {
+        expense.value(forKey: "category") as? String ?? "Other"
+    }
+
+    private static func expenseItem(from expense: NSManagedObject) -> ExpenseItem? {
+        guard let id = expense.value(forKey: "id") as? UUID,
+              let title = expense.value(forKey: "title") as? String,
+              let category = expense.value(forKey: "category") as? String,
+              let createdAt = expense.value(forKey: "createdAt") as? Date else {
+            return nil
+        }
+
+        let amount = expense.value(forKey: "amount") as? Double ?? 0
+        _ = category
+        _ = createdAt
+        return ExpenseItem(id: id, title: title, amount: amount)
     }
 }
 
