@@ -46,6 +46,16 @@ struct SettingsView: View {
                 .padding(.bottom, 20)
         }
         .navigationTitle("Settings")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    triggerBackup()
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                .accessibilityLabel("Share Backup")
+            }
+        }
         .sheet(item: $sharedBackupFile) { sharedBackupFile in
             ShareSheetView(items: [sharedBackupFile.url])
         }
@@ -66,6 +76,10 @@ struct SettingsView: View {
             return
         }
 
+        triggerBackup()
+    }
+
+    private func triggerBackup() {
         Task {
             await backupExpenses()
         }
