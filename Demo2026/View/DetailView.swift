@@ -25,6 +25,12 @@ struct DetailView: View {
         return names.isEmpty ? [category] : names
     }
 
+    private var createdAtText: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-dd-MM"
+        return formatter.string(from: expense.createdAt)
+    }
+
     init(expense: ExpenseItem, category: String, onDelete: @escaping () -> Void, onUpdate: @escaping () -> Void) {
         self.expense = expense
         self.category = category
@@ -36,13 +42,24 @@ struct DetailView: View {
     }
 
     var body: some View {
-        VStack {
-            Text("Detail Screen")
-                .font(.largeTitle)
-            Text("You selected: \(expense.title)")
-                .font(.title2)
+        List {
+            Text(category)
+                .font(.title3)
+                .fontWeight(.bold)
+
+            HStack {
+                Text(expense.title)
+                Spacer()
+                Text(expense.amount, format: .currency(code: "AUD"))
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack {
+                Spacer()
+                Text("Expense On: \(createdAtText)")
+                    .foregroundStyle(.secondary)
+            }
         }
-        .padding()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -140,3 +157,4 @@ struct DetailView: View {
         }
     }
 }
+

@@ -21,17 +21,20 @@ struct ExpenseItem: Identifiable, Codable {
     let id: UUID
     let title: String
     let amount: Double
+    let createdAt: Date
 
     private enum CodingKeys: String, CodingKey {
         case id
         case title
         case amount
+        case createdAt
     }
 
-    init(id: UUID = UUID(), title: String, amount: Double) {
+    init(id: UUID = UUID(), title: String, amount: Double, createdAt: Date = Date()) {
         self.id = id
         self.title = title
         self.amount = amount
+        self.createdAt = createdAt
     }
 
     init(from decoder: Decoder) throws {
@@ -39,6 +42,7 @@ struct ExpenseItem: Identifiable, Codable {
         id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         title = try container.decode(String.self, forKey: .title)
         amount = try container.decode(Double.self, forKey: .amount)
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
     }
 }
 
@@ -306,7 +310,8 @@ enum ExpenseStore {
         }
 
         let amount = expense.value(forKey: "amount") as? Double ?? 0
-        return ExpenseItem(id: id, title: title, amount: amount)
+        let createdAt = expense.value(forKey: "createdAt") as? Date ?? Date()
+        return ExpenseItem(id: id, title: title, amount: amount, createdAt: createdAt)
     }
 
     private static func categoryObject(named name: String) -> NSManagedObject? {
