@@ -18,6 +18,7 @@ struct DetailView: View {
     @State private var selectedCategory: String
     @State private var expenseTitle: String
     @State private var expensePrice: String
+    @State private var expenseDate: Date
     @State private var alertMessage: String?
 
     private var availableCategories: [String] {
@@ -39,6 +40,7 @@ struct DetailView: View {
         _selectedCategory = State(initialValue: category)
         _expenseTitle = State(initialValue: expense.title)
         _expensePrice = State(initialValue: String(format: "%.2f", expense.amount))
+        _expenseDate = State(initialValue: expense.createdAt)
     }
 
     var body: some View {
@@ -96,6 +98,13 @@ struct DetailView: View {
                         .keyboardType(.decimalPad)
                         .textFieldStyle(.roundedBorder)
 
+                    DatePicker(
+                        "Date",
+                        selection: $expenseDate,
+                        displayedComponents: .date
+                    )
+                    .datePickerStyle(.compact)
+
                     Spacer()
 
                     HStack {
@@ -147,7 +156,8 @@ struct DetailView: View {
                 id: expense.id,
                 title: trimmedTitle,
                 amount: amount,
-                category: selectedCategory
+                category: selectedCategory,
+                createdAt: expenseDate
             )
             onUpdate()
             isShowingEditSheet = false
@@ -157,4 +167,3 @@ struct DetailView: View {
         }
     }
 }
-

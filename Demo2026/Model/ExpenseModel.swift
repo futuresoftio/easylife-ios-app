@@ -123,7 +123,8 @@ enum ExpenseStore {
         id: UUID,
         title: String,
         amount: Double,
-        category: String
+        category: String,
+        createdAt: Date
     ) throws {
         let request = storedExpenseFetchRequest()
         request.fetchLimit = 1
@@ -136,6 +137,7 @@ enum ExpenseStore {
         expense.setValue(title, forKey: "title")
         expense.setValue(amount, forKey: "amount")
         expense.setValue(categoryObject(named: category), forKey: "category")
+        expense.setValue(createdAt, forKey: "createdAt")
         try saveContext()
     }
 
