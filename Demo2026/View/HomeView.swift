@@ -45,9 +45,16 @@ struct HomeView: View {
                             VStack(spacing: 12) {
                                 ForEach(category.expenses) { expense in
                                     NavigationLink(
-                                        destination: DetailView(item: expense.title) {
-                                            deleteExpense(expense, from: category)
-                                        }
+                                        destination: DetailView(
+                                            expense: expense,
+                                            category: category.name,
+                                            onDelete: {
+                                                deleteExpense(expense, from: category)
+                                            },
+                                            onUpdate: {
+                                                refreshCategories()
+                                            }
+                                        )
                                     ) {
                                         HStack {
                                             Text(expense.title)

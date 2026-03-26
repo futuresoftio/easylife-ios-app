@@ -115,6 +115,26 @@ enum ExpenseStore {
         }
     }
 
+    static func updateExpense(
+        id: UUID,
+        title: String,
+        amount: Double,
+        category: String
+    ) throws {
+        let request = storedExpenseFetchRequest()
+        request.fetchLimit = 1
+        request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+
+        guard let expense = try viewContext.fetch(request).first else {
+            return
+        }
+
+        expense.setValue(title, forKey: "title")
+        expense.setValue(amount, forKey: "amount")
+        expense.setValue(categoryObject(named: category), forKey: "category")
+        try saveContext()
+    }
+
     static func loadCategorySummaries(for date: Date) -> [CategoryExpenseSummary] {
         seedInitialDataIfNeeded()
 
