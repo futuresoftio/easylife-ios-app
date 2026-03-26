@@ -200,6 +200,21 @@ enum ExpenseStore {
         }
     }
 
+    static func expenseDatesWithItems() -> Set<Date> {
+        seedInitialDataIfNeeded()
+
+        let calendar = Calendar.current
+        return Set(
+            fetchStoredExpenses().compactMap { expense in
+                guard let createdAt = expense.value(forKey: "createdAt") as? Date else {
+                    return nil
+                }
+
+                return calendar.startOfDay(for: createdAt)
+            }
+        )
+    }
+
     private static func fetchStoredExpenses() -> [NSManagedObject] {
         let request = storedExpenseFetchRequest()
         request.sortDescriptors = [
