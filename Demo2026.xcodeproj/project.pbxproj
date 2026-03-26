@@ -26,9 +26,33 @@
 		C0D300022F72C10000AAA001 /* Demo2026UITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Demo2026UITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		A9353B652F750B8C00E44CEE /* Exceptions for "Demo2026" folder in "Demo2026" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Scripts/train_receipt_category_classifier.sh,
+			);
+			target = A9CED4AC2E7E2B7700F077A2 /* Demo2026 */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+		A9353B662F750B8C00E44CEE /* Exceptions for "Demo2026" folder in "Compile Sources" phase from "Demo2026" target */ = {
+			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
+			buildPhase = A9CED4A92E7E2B7700F077A2 /* Sources */;
+			membershipExceptions = (
+				Scripts/train_receipt_category_classifier.sh,
+			);
+		};
+/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		A9CED4AF2E7E2B7700F077A2 /* Demo2026 */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A9353B652F750B8C00E44CEE /* Exceptions for "Demo2026" folder in "Demo2026" target */,
+				A9353B662F750B8C00E44CEE /* Exceptions for "Demo2026" folder in "Compile Sources" phase from "Demo2026" target */,
+			);
 			path = Demo2026;
 			sourceTree = "<group>";
 		};
