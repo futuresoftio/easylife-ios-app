@@ -1,5 +1,5 @@
 //
-//  SettingsView.swift
+//  ReportView.swift
 //  TestApp
 //
 //  Created by Wei Lin on 20/9/2025.
@@ -7,13 +7,12 @@
 
 import SwiftUI
 
-struct SettingsView: View {
+struct ReportView: View {
     private struct SharedBackupFile: Identifiable {
         let id = UUID()
         let url: URL
     }
 
-    private let menuItems = ["Backup", "FAQ", "Privacy"]
     @State private var sharedBackupFile: SharedBackupFile?
     @State private var alertMessage: String?
 
@@ -25,27 +24,15 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            List(menuItems, id: \.self) { item in
-                Button {
-                    handleSelection(for: item)
-                } label: {
-                    HStack {
-                        Text(item)
-                        Spacer()
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
-            }
+            Spacer()
 
             Text(versionText)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
-                .padding(.top, 8)
+                .padding(.horizontal, 20)
                 .padding(.bottom, 20)
         }
-        .navigationTitle("Settings")
+        .navigationTitle("Report")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -71,14 +58,6 @@ struct SettingsView: View {
         }
     }
 
-    private func handleSelection(for item: String) {
-        guard item == "Backup" else {
-            return
-        }
-
-        triggerBackup()
-    }
-
     private func triggerBackup() {
         Task {
             await backupExpenses()
@@ -99,5 +78,5 @@ struct SettingsView: View {
 }
 
 #Preview {
-    SettingsView()
+    ReportView()
 }

@@ -16,8 +16,8 @@ struct ContentView: View {
                 switch selectedTab {
                 case .home:
                     HomeView()
-                case .settings:
-                    SettingsTabView()
+                case .report:
+                    ReportTabView()
                 }
             }
             Divider()
@@ -30,11 +30,11 @@ struct ContentView: View {
                     selectedTab = .home
                 }
                 TabBarButton(
-                    title: AppTab.settings.title,
-                    systemImage: AppTab.settings.systemImage,
-                    isSelected: selectedTab == .settings
+                    title: AppTab.report.title,
+                    systemImage: AppTab.report.systemImage,
+                    isSelected: selectedTab == .report
                 ) {
-                    selectedTab = .settings
+                    selectedTab = .report
                 }
             }
             .padding(.vertical, 12)

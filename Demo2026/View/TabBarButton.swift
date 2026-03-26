@@ -9,14 +9,14 @@ import SwiftUI
 
 enum AppTab {
     case home
-    case settings
+    case report
 
     var title: String {
         switch self {
         case .home:
             return "Home"
-        case .settings:
-            return "Settings"
+        case .report:
+            return "Report"
         }
     }
 
@@ -24,8 +24,8 @@ enum AppTab {
         switch self {
         case .home:
             return "house"
-        case .settings:
-            return "gearshape"
+        case .report:
+            return "chart.bar"
         }
     }
 }

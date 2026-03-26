@@ -1,5 +1,5 @@
 //
-//  SettingsTabView.swift
+//  ReportTabView.swift
 //  TestApp
 //
 //  Created by Wei Lin on 20/9/2025.
@@ -7,10 +7,10 @@
 
 import SwiftUI
 
-struct SettingsTabView: View {
+struct ReportTabView: View {
     var body: some View {
         NavigationStack {
-            SettingsView()
+            ReportView()
         }
     }
 }
