@@ -9,6 +9,9 @@ import Foundation
 import CoreData
 import UIKit
 import Vision
+#if canImport(FoundationModels)
+import FoundationModels
+#endif
 
 struct ExpenseCategory: Identifiable, Codable {
     let name: String
@@ -620,10 +623,15 @@ private extension Data {
 
 enum ReceiptAnalyzer {
     static func analyze(images: [UIImage]) async throws -> [ReceiptExpense] {
-        try await Task.detached(priority: .userInitiated) {
-            let textLines = try images.flatMap(recognizedTextLines(from:))
-            return parseExpenses(from: textLines)
+        let textLines = try await Task.detached(priority: .userInitiated) {
+            try images.flatMap(recognizedTextLines(from:))
         }.value
+
+        if let modelExpenses = try await llmExpenses(from: textLines), !modelExpenses.isEmpty {
+            return modelExpenses
+        }
+
+        return parseExpenses(from: textLines)
     }
 
     private static func recognizedTextLines(from image: UIImage) throws -> [String] {
@@ -799,4 +807,107 @@ enum ReceiptAnalyzer {
 
         return "Other"
     }
+
+    fileprivate static let categoryOptions = [
+        "Food",
+        "Transport",
+        "Groceries",
+        "Entertainment",
+        "Health",
+        "Shopping",
+        "Bills",
+        "Education",
+        "Personal Care",
+        "Home",
+        "Car service",
+        "Other"
+    ]
+
+    fileprivate static func fallbackCategory(for category: String, title: String) -> String {
+        if categoryOptions.contains(category) {
+            return category
+        }
+
+        return Self.category(for: title)
+    }
+
+    private static func llmExpenses(from lines: [String]) async throws -> [ReceiptExpense]? {
+#if canImport(FoundationModels)
+        if #available(iOS 26.0, *) {
+            return try await FoundationModelReceiptExtractor.extract(from: lines)
+        }
+#endif
+
+        return nil
+    }
 }
+
+#if canImport(FoundationModels)
+@available(iOS 26.0, *)
+@Generable
+private struct ReceiptLLMLineItem {
+    @Guide(description: "The expense category. Prefer one of: Food, Transport, Groceries, Entertainment, Health, Shopping, Bills, Education, Personal Care, Home, Car service, Other.")
+    let category: String
+
+    @Guide(description: "A short expense item title from the receipt line.")
+    let title: String
+
+    @Guide(description: "The numeric expense amount only, without currency symbol.")
+    let amount: Double
+}
+
+@available(iOS 26.0, *)
+@Generable
+private struct ReceiptLLMResult {
+    @Guide(description: "The detected expense items from this receipt. Exclude totals, subtotal, tax, payment method, and balance lines.")
+    let expenses: [ReceiptLLMLineItem]
+}
+
+@available(iOS 26.0, *)
+private enum FoundationModelReceiptExtractor {
+    static func extract(from lines: [String]) async throws -> [ReceiptExpense]? {
+        let model = SystemLanguageModel.default
+        guard model.isAvailable else {
+            return nil
+        }
+
+        let receiptText = lines.joined(separator: "\n")
+        guard !receiptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return []
+        }
+
+        let instructions = """
+        Extract expense line items from OCR text of a shopping receipt.
+        Return only actual purchased items.
+        Ignore receipt headers, store details, totals, subtotal, tax, GST, payment lines, card details, change, and balance.
+        Use the provided category names when possible.
+        """
+
+        let categoryList = ReceiptAnalyzer.categoryOptions.joined(separator: ", ")
+        let session = LanguageModelSession(instructions: instructions)
+        let response = try await session.respond(
+            to: """
+            Categories: \(categoryList)
+
+            OCR receipt text:
+            \(receiptText)
+            """,
+            generating: ReceiptLLMResult.self
+        )
+
+        let expenses = response.content.expenses.compactMap { item -> ReceiptExpense? in
+            let title = item.title.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+            guard !title.isEmpty, item.amount > 0 else {
+                return nil
+            }
+
+            return ReceiptExpense(
+                category: ReceiptAnalyzer.fallbackCategory(for: item.category, title: title),
+                item: ExpenseItem(title: title, amount: item.amount)
+            )
+        }
+
+        return expenses
+    }
+}
+#endif
