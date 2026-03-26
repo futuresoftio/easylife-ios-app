@@ -11,6 +11,7 @@ import VisionKit
 
 struct HomeView: View {
     @State private var categories: [ExpenseCategory] = []
+    @State private var isShowingAddOptions = false
     @State private var isShowingScanner = false
     @State private var isProcessingReceipt = false
     @State private var alertMessage: String?
@@ -83,6 +84,14 @@ struct HomeView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
+                        isShowingAddOptions = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .accessibilityLabel("Add")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
                         if VNDocumentCameraViewController.isSupported {
                             isShowingScanner = true
                         } else {
@@ -110,6 +119,40 @@ struct HomeView: View {
                         alertMessage = error.localizedDescription
                     }
                 )
+            }
+            .sheet(isPresented: $isShowingAddOptions) {
+                VStack(spacing: 16) {
+                    Capsule()
+                        .fill(Color.secondary.opacity(0.35))
+                        .frame(width: 44, height: 5)
+                        .padding(.top, 12)
+
+                    Text("Add")
+                        .font(.headline)
+
+                    Button("Add new category") {
+                        isShowingAddOptions = false
+                        alertMessage = "Add new category is not implemented yet."
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .frame(maxWidth: .infinity)
+
+                    Button("Add new expense") {
+                        isShowingAddOptions = false
+                        alertMessage = "Add new expense is not implemented yet."
+                    }
+                    .buttonStyle(.bordered)
+                    .frame(maxWidth: .infinity)
+
+                    Button("Cancel", role: .cancel) {
+                        isShowingAddOptions = false
+                    }
+                    .padding(.top, 8)
+
+                    Spacer()
+                }
+                .padding(.horizontal, 20)
+                .presentationDetents([.height(240)])
             }
             .overlay {
                 if isProcessingReceipt {
