@@ -15,6 +15,7 @@ struct ReportView: View {
     }
 
     @State private var categorySummaries: [CategoryExpenseSummary] = []
+    @State private var selectedDate = Date()
     @State private var selectedChartCategory: String?
     @State private var selectedBreakdown: CategoryExpenseBreakdown?
     @State private var sharedBackupFile: SharedBackupFile?
@@ -24,9 +25,9 @@ struct ReportView: View {
     private var chartSection: some View {
         if categorySummaries.isEmpty {
             ContentUnavailableView(
-                "No Expenses Today",
+                "No Expenses",
                 systemImage: "chart.bar.xaxis",
-                description: Text("Today's expense chart will appear here once expenses are available.")
+                description: Text("The expense chart will appear here once expenses are available for the selected date.")
             )
         } else {
             Chart(categorySummaries) { summary in
@@ -50,26 +51,33 @@ struct ReportView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Today's Expense")
-                .font(.headline)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                DatePicker(
+                    "Date",
+                    selection: $selectedDate,
+                    displayedComponents: .date
+                )
+                .datePickerStyle(.graphical)
                 .padding(.horizontal, 20)
                 .padding(.top, 20)
 
-            chartSection
-
-            Spacer()
+                chartSection
+            }
         }
         .navigationTitle("Report")
         .task {
-            categorySummaries = ExpenseStore.loadTodayCategorySummaries()
+            refreshCategorySummaries()
+        }
+        .onChange(of: selectedDate) { _, _ in
+            refreshCategorySummaries()
         }
         .onChange(of: selectedChartCategory) { _, newValue in
             guard let newValue else {
                 return
             }
 
-            selectedBreakdown = ExpenseStore.loadTodayExpenseBreakdown(for: newValue)
+            selectedBreakdown = ExpenseStore.loadExpenseBreakdown(for: newValue, date: selectedDate)
             selectedChartCategory = nil
         }
         .toolbar {
@@ -104,6 +112,10 @@ struct ReportView: View {
         Task {
             await backupExpenses()
         }
+    }
+
+    private func refreshCategorySummaries() {
+        categorySummaries = ExpenseStore.loadCategorySummaries(for: selectedDate)
     }
 
     private func breakdownSheet(for breakdown: CategoryExpenseBreakdown) -> some View {

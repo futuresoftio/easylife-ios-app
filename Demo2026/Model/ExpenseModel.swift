@@ -115,19 +115,12 @@ enum ExpenseStore {
         }
     }
 
-    static func loadTodayCategorySummaries() -> [CategoryExpenseSummary] {
+    static func loadCategorySummaries(for date: Date) -> [CategoryExpenseSummary] {
         seedInitialDataIfNeeded()
 
-        let calendar = Calendar.current
-        let todayExpenses = fetchStoredExpenses().filter { expense in
-            guard let createdAt = expense.value(forKey: "createdAt") as? Date else {
-                return false
-            }
+        let filteredExpenses = expenses(for: date)
 
-            return calendar.isDateInToday(createdAt)
-        }
-
-        let groupedTotals = Dictionary(grouping: todayExpenses, by: { expenseCategory(for: $0) })
+        let groupedTotals = Dictionary(grouping: filteredExpenses, by: { expenseCategory(for: $0) })
             .map { category, expenses in
                 CategoryExpenseSummary(
                     category: category,
@@ -140,17 +133,12 @@ enum ExpenseStore {
         return groupedTotals.sorted { $0.category < $1.category }
     }
 
-    static func loadTodayExpenseBreakdown(for category: String) -> CategoryExpenseBreakdown? {
+    static func loadExpenseBreakdown(for category: String, date: Date) -> CategoryExpenseBreakdown? {
         seedInitialDataIfNeeded()
 
-        let calendar = Calendar.current
-        let expenses = fetchStoredExpenses()
+        let expenses = expenses(for: date)
             .filter { expense in
-                guard let createdAt = expense.value(forKey: "createdAt") as? Date else {
-                    return false
-                }
-
-                return calendar.isDateInToday(createdAt) && expenseCategory(for: expense) == category
+                expenseCategory(for: expense) == category
             }
             .compactMap(expenseItem(from:))
 
@@ -188,6 +176,17 @@ enum ExpenseStore {
         ]
 
         return (try? viewContext.fetch(request)) ?? []
+    }
+
+    private static func expenses(for date: Date) -> [NSManagedObject] {
+        let calendar = Calendar.current
+        return fetchStoredExpenses().filter { expense in
+            guard let createdAt = expense.value(forKey: "createdAt") as? Date else {
+                return false
+            }
+
+            return calendar.isDate(createdAt, inSameDayAs: date)
+        }
     }
 
     private static func seedInitialDataIfNeeded() {
