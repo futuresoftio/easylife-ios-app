@@ -14,7 +14,7 @@ enum AppTab {
     var title: String {
         switch self {
         case .home:
-            return "Home"
+            return "Expense"
         case .report:
             return "Report"
         }
@@ -23,7 +23,7 @@ enum AppTab {
     var systemImage: String {
         switch self {
         case .home:
-            return "house"
+            return "dollarsign.circle"
         case .report:
             return "chart.bar"
         }
