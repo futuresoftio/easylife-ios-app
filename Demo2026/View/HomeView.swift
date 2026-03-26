@@ -404,12 +404,20 @@ struct HomeView: View {
 
     @ViewBuilder
     private func dayBackground(for day: CalendarDay) -> some View {
-        if Calendar.current.isDate(day.date, inSameDayAs: pendingFilterDate) {
-            Circle()
-                .fill(Color.blue.opacity(0.18))
-                .frame(width: 32, height: 32)
-        } else {
-            Color.clear
+        let calendar = Calendar.current
+
+        ZStack {
+            if calendar.isDateInToday(day.date) {
+                Circle()
+                    .stroke(Color.blue, lineWidth: 1.5)
+                    .frame(width: 32, height: 32)
+            }
+
+            if calendar.isDate(day.date, inSameDayAs: pendingFilterDate) {
+                Circle()
+                    .fill(Color.blue.opacity(0.18))
+                    .frame(width: 32, height: 32)
+            }
         }
     }
 }
