@@ -90,6 +90,11 @@ enum ExpenseStore {
         return categories(from: fetchStoredExpenses())
     }
 
+    static func loadCategories(for date: Date) -> [ExpenseCategory] {
+        seedInitialDataIfNeeded()
+        return categories(from: expenses(for: date))
+    }
+
     static func preloadInitialData() {
         seedInitialDataIfNeeded()
     }

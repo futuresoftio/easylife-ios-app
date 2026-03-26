@@ -215,7 +215,7 @@ struct HomeView: View {
     }
 
     private func refreshCategories() {
-        categories = ExpenseStore.loadCategories()
+        categories = ExpenseStore.loadCategories(for: Date())
     }
 }
 
