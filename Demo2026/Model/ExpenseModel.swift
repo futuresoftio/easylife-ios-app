@@ -47,6 +47,20 @@ struct ReceiptExpense {
     let item: ExpenseItem
 }
 
+struct CategoryExpenseSummary: Identifiable {
+    let category: String
+    let totalExpense: Double
+
+    var id: String { category }
+}
+
+struct CategoryExpenseBreakdown: Identifiable {
+    let category: String
+    let expenses: [ExpenseItem]
+
+    var id: String { category }
+}
+
 private struct ReceiptContext {
     let title: String
     let category: String
@@ -99,6 +113,52 @@ enum ExpenseStore {
             viewContext.delete(expense)
             try saveContext()
         }
+    }
+
+    static func loadTodayCategorySummaries() -> [CategoryExpenseSummary] {
+        seedInitialDataIfNeeded()
+
+        let calendar = Calendar.current
+        let todayExpenses = fetchStoredExpenses().filter { expense in
+            guard let createdAt = expense.value(forKey: "createdAt") as? Date else {
+                return false
+            }
+
+            return calendar.isDateInToday(createdAt)
+        }
+
+        let groupedTotals = Dictionary(grouping: todayExpenses, by: { expenseCategory(for: $0) })
+            .map { category, expenses in
+                CategoryExpenseSummary(
+                    category: category,
+                    totalExpense: expenses.reduce(0) { partialResult, expense in
+                        partialResult + (expense.value(forKey: "amount") as? Double ?? 0)
+                    }
+                )
+            }
+
+        return groupedTotals.sorted { $0.category < $1.category }
+    }
+
+    static func loadTodayExpenseBreakdown(for category: String) -> CategoryExpenseBreakdown? {
+        seedInitialDataIfNeeded()
+
+        let calendar = Calendar.current
+        let expenses = fetchStoredExpenses()
+            .filter { expense in
+                guard let createdAt = expense.value(forKey: "createdAt") as? Date else {
+                    return false
+                }
+
+                return calendar.isDateInToday(createdAt) && expenseCategory(for: expense) == category
+            }
+            .compactMap(expenseItem(from:))
+
+        guard !expenses.isEmpty else {
+            return nil
+        }
+
+        return CategoryExpenseBreakdown(category: category, expenses: expenses)
     }
 
     static func categories(from expenses: [NSManagedObject]) -> [ExpenseCategory] {
