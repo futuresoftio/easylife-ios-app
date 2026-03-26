@@ -12,9 +12,12 @@ import VisionKit
 struct HomeView: View {
     @State private var categories: [ExpenseCategory] = []
     @State private var isShowingAddOptions = false
+    @State private var isShowingDateFilterSheet = false
     @State private var isShowingScanner = false
     @State private var isProcessingReceipt = false
     @State private var alertMessage: String?
+    @State private var selectedFilterDate = Date()
+    @State private var pendingFilterDate = Date()
 
     private var todayExpense: Double {
         categories
@@ -22,14 +25,35 @@ struct HomeView: View {
             .reduce(0) { $0 + $1.amount }
     }
 
+    private var expenseHeaderTitle: String {
+        if Calendar.current.isDateInToday(selectedFilterDate) {
+            return "Today's Expense"
+        }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return "Date \(formatter.string(from: selectedFilterDate))"
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 16, pinnedViews: [.sectionHeaders]) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Today's Expense")
-                            .font(.headline)
-                            .foregroundStyle(.secondary)
+                        HStack {
+                            Text(expenseHeaderTitle)
+                                .font(.headline)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Button {
+                                pendingFilterDate = selectedFilterDate
+                                isShowingDateFilterSheet = true
+                            } label: {
+                                Image(systemName: "calendar")
+                                    .font(.headline)
+                            }
+                            .accessibilityLabel("Filter Date")
+                        }
                         Text(todayExpense, format: .currency(code: "AUD"))
                             .font(.system(size: 34, weight: .bold, design: .rounded))
                     }
@@ -161,6 +185,44 @@ struct HomeView: View {
                 .padding(.horizontal, 20)
                 .presentationDetents([.height(240)])
             }
+            .sheet(isPresented: $isShowingDateFilterSheet) {
+                NavigationStack {
+                    VStack(alignment: .leading, spacing: 20) {
+                        DatePicker(
+                            "Date",
+                            selection: $pendingFilterDate,
+                            displayedComponents: .date
+                        )
+                        .datePickerStyle(.graphical)
+
+                        HStack {
+                            Button("Cancel", role: .cancel) {
+                                isShowingDateFilterSheet = false
+                            }
+                            .buttonStyle(.bordered)
+
+                            Spacer()
+
+                            Button("Save") {
+                                let hasChanged = !Calendar.current.isDate(pendingFilterDate, inSameDayAs: selectedFilterDate)
+                                isShowingDateFilterSheet = false
+
+                                guard hasChanged else {
+                                    return
+                                }
+
+                                selectedFilterDate = pendingFilterDate
+                                refreshCategories()
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                    }
+                    .padding(20)
+                    .navigationTitle("Select Date")
+                    .navigationBarTitleDisplayMode(.inline)
+                }
+                .presentationDetents([.medium])
+            }
             .overlay {
                 if isProcessingReceipt {
                     ZStack {
@@ -215,7 +277,7 @@ struct HomeView: View {
     }
 
     private func refreshCategories() {
-        categories = ExpenseStore.loadCategories(for: Date())
+        categories = ExpenseStore.loadCategories(for: selectedFilterDate)
     }
 }
 
