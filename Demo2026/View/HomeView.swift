@@ -32,7 +32,7 @@ struct HomeView: View {
 
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
-        return "Date \(formatter.string(from: selectedFilterDate))"
+        return "Expense on \(formatter.string(from: selectedFilterDate))"
     }
 
     var body: some View {
@@ -195,15 +195,18 @@ struct HomeView: View {
                         )
                         .datePickerStyle(.graphical)
 
-                        HStack {
-                            Button("Cancel", role: .cancel) {
+                        Spacer(minLength: 0)
+
+                        HStack(spacing: 12) {
+                            Button(role: .cancel) {
                                 isShowingDateFilterSheet = false
+                            } label: {
+                                Text("Cancel")
+                                    .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.bordered)
 
-                            Spacer()
-
-                            Button("Save") {
+                            Button {
                                 let hasChanged = !Calendar.current.isDate(pendingFilterDate, inSameDayAs: selectedFilterDate)
                                 isShowingDateFilterSheet = false
 
@@ -213,15 +216,20 @@ struct HomeView: View {
 
                                 selectedFilterDate = pendingFilterDate
                                 refreshCategories()
+                            } label: {
+                                Text("Ok")
+                                    .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.borderedProminent)
                         }
+                        .padding(.top, 8)
+                        .padding(.bottom, 12)
                     }
                     .padding(20)
                     .navigationTitle("Select Date")
                     .navigationBarTitleDisplayMode(.inline)
                 }
-                .presentationDetents([.medium])
+                .presentationDetents([.height(520)])
             }
             .overlay {
                 if isProcessingReceipt {
