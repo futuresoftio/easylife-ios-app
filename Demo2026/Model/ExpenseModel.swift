@@ -60,6 +60,13 @@ struct CategoryExpenseSummary: Identifiable {
     var id: String { category }
 }
 
+struct DailyExpenseSummary: Identifiable {
+    let date: Date
+    let totalExpense: Double
+
+    var id: Date { date }
+}
+
 struct CategoryExpenseBreakdown: Identifiable {
     let category: String
     let expenses: [ExpenseItem]
@@ -204,6 +211,35 @@ enum ExpenseStore {
             }
 
         return groupedTotals.sorted { $0.category < $1.category }
+    }
+
+    static func loadDailyExpenseSummaries(forMonthContaining date: Date) -> [DailyExpenseSummary] {
+        seedInitialDataIfNeeded()
+
+        let calendar = Calendar.current
+        let monthExpenses = fetchStoredExpenses().filter { expense in
+            guard let createdAt = expense.value(forKey: "createdAt") as? Date else {
+                return false
+            }
+
+            return calendar.isDate(createdAt, equalTo: date, toGranularity: .month)
+                && calendar.isDate(createdAt, equalTo: date, toGranularity: .year)
+        }
+
+        let groupedTotals = Dictionary(grouping: monthExpenses) { expense in
+            let createdAt = expense.value(forKey: "createdAt") as? Date ?? date
+            return calendar.startOfDay(for: createdAt)
+        }
+        .map { date, expenses in
+            DailyExpenseSummary(
+                date: date,
+                totalExpense: expenses.reduce(0) { partialResult, expense in
+                    partialResult + (expense.value(forKey: "amount") as? Double ?? 0)
+                }
+            )
+        }
+
+        return groupedTotals.sorted { $0.date < $1.date }
     }
 
     static func loadExpenseBreakdown(for category: String, date: Date) -> CategoryExpenseBreakdown? {
