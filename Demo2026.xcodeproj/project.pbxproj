@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A9DD954E2F835D4B00589DD7 /* GoogleMobileAds in Frameworks */ = {isa = PBXBuildFile; productRef = A9DD954D2F835D4B00589DD7 /* GoogleMobileAds */; };
 		C0D300012F72C10000AAA001 /* Demo2026UITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D300002F72C10000AAA001 /* Demo2026UITests.swift */; };
 /* End PBXBuildFile section */
 
@@ -30,6 +31,7 @@
 		A9353B652F750B8C00E44CEE /* Exceptions for "Demo2026" folder in "Demo2026" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Info.plist,
 				Scripts/train_receipt_category_classifier.sh,
 			);
 			target = A9CED4AC2E7E2B7700F077A2 /* Demo2026 */;
@@ -63,6 +65,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A9DD954E2F835D4B00589DD7 /* GoogleMobileAds in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -90,6 +93,7 @@
 				A9CED4AF2E7E2B7700F077A2 /* Demo2026 */,
 				A9CED4AE2E7E2B7700F077A2 /* Products */,
 				A95F65222F72B1B0004CC81D /* Demo2026UITests */,
+				A9DD954C2F835D4B00589DD7 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -100,6 +104,13 @@
 				C0D300022F72C10000AAA001 /* Demo2026UITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		A9DD954C2F835D4B00589DD7 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -122,6 +133,7 @@
 			);
 			name = Demo2026;
 			packageProductDependencies = (
+				A9DD954D2F835D4B00589DD7 /* GoogleMobileAds */,
 			);
 			productName = Demo2026;
 			productReference = A9CED4AD2E7E2B7700F077A2 /* Demo2026.app */;
@@ -175,6 +187,9 @@
 			);
 			mainGroup = A9CED4A42E7E2B7700F077A2;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				A9DD951E2F83580300589DD7 /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A9CED4AE2E7E2B7700F077A2 /* Products */;
 			projectDirPath = "";
@@ -360,7 +375,8 @@
 				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = SV78M7828Z;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Demo2026/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Easy Life 26";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Allow camera access to scan receipts and categorize expenses.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -391,7 +407,8 @@
 				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = SV78M7828Z;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Demo2026/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Easy Life 26";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Allow camera access to scan receipts and categorize expenses.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -476,6 +493,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A9DD951E2F83580300589DD7 /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/googleads/swift-package-manager-google-mobile-ads.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 13.2.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A9DD954D2F835D4B00589DD7 /* GoogleMobileAds */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A9DD951E2F83580300589DD7 /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */;
+			productName = GoogleMobileAds;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A9CED4A52E7E2B7700F077A2 /* Project object */;
 }
