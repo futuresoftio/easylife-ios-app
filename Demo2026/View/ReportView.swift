@@ -7,6 +7,10 @@
 
 import SwiftUI
 import Charts
+#if canImport(GoogleMobileAds)
+import GoogleMobileAds
+import UIKit
+#endif
 
 struct ReportView: View {
     private struct SharedBackupFile: Identifiable {
@@ -156,6 +160,12 @@ struct ReportView: View {
         } message: {
             Text(alertMessage ?? "")
         }
+        .safeAreaInset(edge: .bottom) {
+            AdMobBannerContainer()
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .background(.thinMaterial)
+        }
     }
 
     private func triggerBackup() {
@@ -196,6 +206,67 @@ struct ReportView: View {
         }
     }
 }
+
+private struct AdMobBannerContainer: View {
+    var body: some View {
+#if canImport(GoogleMobileAds)
+        ReportBannerAdView()
+            .frame(height: 50)
+#else
+        EmptyView()
+#endif
+    }
+}
+
+#if canImport(GoogleMobileAds)
+private struct ReportBannerAdView: UIViewRepresentable {
+//    private let adUnitID = "ca-app-pub-3940256099942544/2435281174"
+    private let adUnitID = "ca-app-pub-7774404592897854/5421695753"
+
+    func makeUIView(context: Context) -> BannerView {
+        let bannerView = BannerView(adSize: AdSizeBanner)
+        bannerView.adUnitID = adUnitID
+        bannerView.rootViewController = UIApplication.shared.topViewController
+        bannerView.load(Request())
+        return bannerView
+    }
+
+    func updateUIView(_ uiView: BannerView, context: Context) {
+        uiView.rootViewController = UIApplication.shared.topViewController
+    }
+}
+
+private extension UIApplication {
+    var topViewController: UIViewController? {
+        connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)?
+            .rootViewController?
+            .topMostViewController()
+    }
+}
+
+private extension UIViewController {
+    func topMostViewController() -> UIViewController {
+        if let presentedViewController {
+            return presentedViewController.topMostViewController()
+        }
+
+        if let navigationController = self as? UINavigationController,
+           let visibleViewController = navigationController.visibleViewController {
+            return visibleViewController.topMostViewController()
+        }
+
+        if let tabBarController = self as? UITabBarController,
+           let selectedViewController = tabBarController.selectedViewController {
+            return selectedViewController.topMostViewController()
+        }
+
+        return self
+    }
+}
+#endif
 
 #Preview {
     ReportView()
