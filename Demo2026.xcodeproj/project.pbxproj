@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		A9DD954E2F835D4B00589DD7 /* GoogleMobileAds in Frameworks */ = {isa = PBXBuildFile; productRef = A9DD954D2F835D4B00589DD7 /* GoogleMobileAds */; };
+		A9DD95A72F83890400589DD7 /* CoreXLSX in Frameworks */ = {isa = PBXBuildFile; productRef = A9DD95A62F83890400589DD7 /* CoreXLSX */; };
 		C0D300012F72C10000AAA001 /* Demo2026UITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0D300002F72C10000AAA001 /* Demo2026UITests.swift */; };
 /* End PBXBuildFile section */
 
@@ -65,6 +66,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A9DD95A72F83890400589DD7 /* CoreXLSX in Frameworks */,
 				A9DD954E2F835D4B00589DD7 /* GoogleMobileAds in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -134,6 +136,7 @@
 			name = Demo2026;
 			packageProductDependencies = (
 				A9DD954D2F835D4B00589DD7 /* GoogleMobileAds */,
+				A9DD95A62F83890400589DD7 /* CoreXLSX */,
 			);
 			productName = Demo2026;
 			productReference = A9CED4AD2E7E2B7700F077A2 /* Demo2026.app */;
@@ -189,6 +192,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				A9DD951E2F83580300589DD7 /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */,
+				A9DD95A52F8388F600589DD7 /* XCRemoteSwiftPackageReference "CoreXLSX" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A9CED4AE2E7E2B7700F077A2 /* Products */;
@@ -503,6 +507,14 @@
 				minimumVersion = 13.2.0;
 			};
 		};
+		A9DD95A52F8388F600589DD7 /* XCRemoteSwiftPackageReference "CoreXLSX" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/CoreOffice/CoreXLSX";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.14.2;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -510,6 +522,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A9DD951E2F83580300589DD7 /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */;
 			productName = GoogleMobileAds;
+		};
+		A9DD95A62F83890400589DD7 /* CoreXLSX */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A9DD95A52F8388F600589DD7 /* XCRemoteSwiftPackageReference "CoreXLSX" */;
+			productName = CoreXLSX;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

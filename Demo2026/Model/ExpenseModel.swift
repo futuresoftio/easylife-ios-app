@@ -8,6 +8,7 @@
 import Foundation
 import CoreML
 import CoreData
+import CoreXLSX
 import NaturalLanguage
 import UIKit
 import Vision
@@ -293,6 +294,40 @@ enum ExpenseStore {
         )
     }
 
+    static func importExcelFile(from url: URL) throws {
+        seedInitialDataIfNeeded()
+
+        let importedExpenses = try ExpenseSpreadsheetImporter.importExpenses(from: url)
+        let calendar = Calendar.current
+        let importedDays = Set(importedExpenses.map { calendar.startOfDay(for: $0.createdAt) })
+
+        for storedExpense in fetchStoredExpenses() {
+            guard let createdAt = storedExpense.value(forKey: "createdAt") as? Date else {
+                continue
+            }
+
+            if importedDays.contains(calendar.startOfDay(for: createdAt)) {
+                viewContext.delete(storedExpense)
+            }
+        }
+
+        var offsetsByDay = [Date: Int]()
+        for expense in importedExpenses {
+            let day = calendar.startOfDay(for: expense.createdAt)
+            let offset = offsetsByDay[day, default: 0]
+            offsetsByDay[day] = offset + 1
+
+            insertExpense(
+                title: expense.title,
+                amount: expense.amount,
+                category: expense.category,
+                createdAt: day.addingTimeInterval(TimeInterval(offset))
+            )
+        }
+
+        try saveContext()
+    }
+
     private static func fetchStoredExpenses() -> [NSManagedObject] {
         let request = storedExpenseFetchRequest()
         request.sortDescriptors = [
@@ -539,8 +574,8 @@ enum ExpenseBackupExporter {
     """
 
     private static func worksheetXML(from categories: [ExpenseCategory]) -> String {
-        var rows = [headerRow()]
-        var rowIndex = 2
+        var rows: [String] = []
+        var rowIndex = 1
 
         for category in categories {
             for expense in category.expenses {
@@ -564,17 +599,6 @@ enum ExpenseBackupExporter {
                 \(rows.joined(separator: "\n"))
             </sheetData>
         </worksheet>
-        """
-    }
-
-    private static func headerRow() -> String {
-        """
-        <row r="1">
-            \(inlineStringCell(reference: "A1", value: "Category"))
-            \(inlineStringCell(reference: "B1", value: "Item"))
-            \(inlineStringCell(reference: "C1", value: "Amount"))
-            \(inlineStringCell(reference: "D1", value: "Date"))
-        </row>
         """
     }
 
@@ -709,6 +733,125 @@ enum ExpenseBackupExporter {
             return crc ^ 0xFFFF_FFFF
         }
     }
+}
+
+enum ExpenseSpreadsheetImporter {
+    struct ImportedExpense {
+        let category: String
+        let title: String
+        let amount: Double
+        let createdAt: Date
+    }
+
+    enum ImportError: LocalizedError {
+        case invalidFileType
+        case unsupportedArchive
+        case missingWorksheet
+        case invalidWorksheet
+        case invalidRow(Int)
+        case emptyImport
+
+        var errorDescription: String? {
+            switch self {
+            case .invalidFileType:
+                return "Please choose an Excel .xlsx file."
+            case .unsupportedArchive:
+                return "The selected Excel file is not in the exported expense format."
+            case .missingWorksheet, .invalidWorksheet:
+                return "The selected Excel file could not be read."
+            case .invalidRow(let row):
+                return "The Excel file contains an invalid expense row at line \(row)."
+            case .emptyImport:
+                return "The selected Excel file does not contain any expenses."
+            }
+        }
+    }
+
+    static func importExpenses(from url: URL) throws -> [ImportedExpense] {
+        guard url.pathExtension.lowercased() == "xlsx" else {
+            throw ImportError.invalidFileType
+        }
+
+        guard let file = XLSXFile(filepath: url.path) else {
+            throw ImportError.unsupportedArchive
+        }
+
+        let sharedStrings = try file.parseSharedStrings()
+        guard let workbook = try file.parseWorkbooks().first else {
+            throw ImportError.missingWorksheet
+        }
+
+        guard let worksheetPath = try file.parseWorksheetPathsAndNames(workbook: workbook).first?.path else {
+            throw ImportError.missingWorksheet
+        }
+
+        let worksheet = try file.parseWorksheet(at: worksheetPath)
+        return try parseWorksheet(worksheet, sharedStrings: sharedStrings)
+    }
+
+    private static func parseWorksheet(_ worksheet: Worksheet, sharedStrings: SharedStrings?) throws -> [ImportedExpense] {
+        guard let rows = worksheet.data?.rows, !rows.isEmpty else {
+            throw ImportError.emptyImport
+        }
+
+        var importedExpenses: [ImportedExpense] = []
+        for row in rows {
+            let cells = Dictionary(uniqueKeysWithValues: row.cells.map { cell in
+                (cell.reference.column.value, stringValue(for: cell, sharedStrings: sharedStrings))
+            })
+
+            if cells.values.allSatisfy({ $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
+                continue
+            }
+
+            guard let category = cells["A"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  let title = cells["B"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  let amountString = cells["C"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  let dateString = cells["D"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !category.isEmpty,
+                  !title.isEmpty,
+                  let amount = Double(amountString),
+                  let createdAt = importDateFormatter.date(from: dateString) else {
+                throw ImportError.invalidRow(Int(row.reference))
+            }
+
+            importedExpenses.append(
+                ImportedExpense(
+                    category: category,
+                    title: title,
+                    amount: amount,
+                    createdAt: createdAt
+                )
+            )
+        }
+
+        guard !importedExpenses.isEmpty else {
+            throw ImportError.emptyImport
+        }
+
+        return importedExpenses
+    }
+
+    private static func stringValue(for cell: Cell, sharedStrings: SharedStrings?) -> String {
+        if let sharedStrings, let value = cell.stringValue(sharedStrings) {
+            return value
+        }
+
+        if let inlineText = cell.inlineString?.text {
+            return inlineText
+        }
+
+        return cell.value ?? ""
+    }
+
+    private static let importDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
 }
 
 private extension Data {

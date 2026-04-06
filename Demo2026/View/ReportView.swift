@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Charts
+import UniformTypeIdentifiers
 #if canImport(GoogleMobileAds)
 import GoogleMobileAds
 import UIKit
@@ -21,6 +22,7 @@ struct ReportView: View {
     @State private var dailySummaries: [DailyExpenseSummary] = []
     @State private var selectedDate = Date()
     @State private var sharedBackupFile: SharedBackupFile?
+    @State private var isShowingImportPicker = false
     @State private var alertMessage: String?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
@@ -147,6 +149,15 @@ struct ReportView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
+                    isShowingImportPicker = true
+                } label: {
+                    Image(systemName: "square.and.arrow.down")
+                }
+                .accessibilityLabel("Import Expenses")
+            }
+
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
                     triggerBackup()
                 } label: {
                     Image(systemName: "square.and.arrow.up")
@@ -156,6 +167,13 @@ struct ReportView: View {
         }
         .sheet(item: $sharedBackupFile) { sharedBackupFile in
             ShareSheetView(items: [sharedBackupFile.url])
+        }
+        .fileImporter(
+            isPresented: $isShowingImportPicker,
+            allowedContentTypes: supportedImportTypes,
+            allowsMultipleSelection: false
+        ) { result in
+            handleImportSelection(result)
         }
         .alert("Backup", isPresented: Binding(
             get: { alertMessage != nil },
@@ -178,6 +196,21 @@ struct ReportView: View {
     private func triggerBackup() {
         Task {
             await backupExpenses()
+        }
+    }
+
+    private func handleImportSelection(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard let fileURL = urls.first else {
+                return
+            }
+
+            Task {
+                await importExpenses(from: fileURL)
+            }
+        case .failure:
+            alertMessage = "Failed to select the Excel file."
         }
     }
 
@@ -211,6 +244,34 @@ struct ReportView: View {
         } catch {
             alertMessage = "Failed to create the backup file."
         }
+    }
+
+    @MainActor
+    private func importExpenses(from url: URL) async {
+        let hasAccess = url.startAccessingSecurityScopedResource()
+        defer {
+            if hasAccess {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        do {
+            try await Task.detached(priority: .userInitiated) {
+                try ExpenseStore.importExcelFile(from: url)
+            }.value
+            refreshDailySummaries()
+            alertMessage = "Expenses imported successfully."
+        } catch {
+            alertMessage = error.localizedDescription
+        }
+    }
+
+    private var supportedImportTypes: [UTType] {
+        if let spreadsheetType = UTType(filenameExtension: "xlsx") {
+            return [spreadsheetType]
+        }
+
+        return [.data]
     }
 }
 
