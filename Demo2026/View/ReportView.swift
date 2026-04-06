@@ -22,6 +22,8 @@ struct ReportView: View {
     @State private var selectedDate = Date()
     @State private var sharedBackupFile: SharedBackupFile?
     @State private var alertMessage: String?
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     private var calendar: Calendar {
         Calendar.current
@@ -50,6 +52,10 @@ struct ReportView: View {
 
     private var monthlyTotalExpense: Double {
         dailySummaries.reduce(0) { $0 + $1.totalExpense }
+    }
+
+    private var layoutRefreshID: String {
+        "\(horizontalSizeClass == .compact)-\(verticalSizeClass == .compact)"
     }
 
     @ViewBuilder
@@ -130,6 +136,7 @@ struct ReportView: View {
                 chartSection
             }
         }
+        .id(layoutRefreshID)
         .navigationTitle("Report")
         .task {
             refreshDailySummaries()
