@@ -19,10 +19,12 @@ struct HomeView: View {
 
     @State private var categories: [ExpenseCategory] = []
     @State private var isShowingAddOptions = false
+    @State private var isShowingAddCategorySheet = false
     @State private var isShowingDateFilterSheet = false
     @State private var isShowingScanner = false
     @State private var isProcessingReceipt = false
     @State private var alertMessage: String?
+    @State private var newCategoryName = ""
     @State private var selectedFilterDate = Date()
     @State private var pendingFilterDate = Date()
     @State private var calendarMonth = Calendar.current.startOfMonth(for: Date())
@@ -116,45 +118,55 @@ struct HomeView: View {
                             .fill(Color.blue.opacity(0.12))
                     )
 
-                    ForEach(categories) { category in
-                        Section {
-                            VStack(spacing: 12) {
-                                ForEach(category.expenses) { expense in
-                                    NavigationLink(
-                                        destination: DetailView(
-                                            expense: expense,
-                                            category: category.name,
-                                            onDelete: {
-                                                deleteExpense(expense, from: category)
-                                            },
-                                            onUpdate: {
-                                                refreshCategories()
+                    if categories.isEmpty {
+                        ContentUnavailableView(
+                            "No Expenses",
+                            systemImage: "receipt",
+                            description: Text("The expense will appear here once\n expenses are available for Tody.")
+                        )
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 24)
+                    } else {
+                        ForEach(categories) { category in
+                            Section {
+                                VStack(spacing: 12) {
+                                    ForEach(category.expenses) { expense in
+                                        NavigationLink(
+                                            destination: DetailView(
+                                                expense: expense,
+                                                category: category.name,
+                                                onDelete: {
+                                                    deleteExpense(expense, from: category)
+                                                },
+                                                onUpdate: {
+                                                    refreshCategories()
+                                                }
+                                            )
+                                        ) {
+                                            HStack {
+                                                Text(expense.title)
+                                                    .foregroundStyle(.primary)
+                                                Spacer()
+                                                Text(expense.amount, format: .currency(code: "AUD"))
+                                                    .foregroundStyle(.secondary)
                                             }
-                                        )
-                                    ) {
-                                        HStack {
-                                            Text(expense.title)
-                                                .foregroundStyle(.primary)
-                                            Spacer()
-                                            Text(expense.amount, format: .currency(code: "AUD"))
-                                                .foregroundStyle(.secondary)
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 14)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                                    .fill(Color(.secondarySystemBackground))
+                                            )
                                         }
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 14)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                                .fill(Color(.secondarySystemBackground))
-                                        )
                                     }
                                 }
+                            } header: {
+                                Text(category.name)
+                                    .font(.headline)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 8)
+                                    .background(Color(.systemBackground).opacity(0.95))
                             }
-                        } header: {
-                            Text(category.name)
-                                .font(.headline)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 8)
-                                .background(Color(.systemBackground).opacity(0.95))
                         }
                     }
                 }
@@ -215,7 +227,8 @@ struct HomeView: View {
 
                     Button("Add new category") {
                         isShowingAddOptions = false
-                        alertMessage = "Add new category is not implemented yet."
+                        newCategoryName = ""
+                        isShowingAddCategorySheet = true
                     }
                     .buttonStyle(.borderedProminent)
                     .frame(maxWidth: .infinity)
@@ -236,6 +249,33 @@ struct HomeView: View {
                 }
                 .padding(.horizontal, 20)
                 .presentationDetents([.height(240)])
+            }
+            .sheet(isPresented: $isShowingAddCategorySheet) {
+                NavigationStack {
+                    VStack(alignment: .leading, spacing: 16) {
+                        TextField("Category name", text: $newCategoryName)
+                            .textFieldStyle(.roundedBorder)
+
+                        Spacer()
+
+                        HStack {
+                            Button("Cancel", role: .cancel) {
+                                isShowingAddCategorySheet = false
+                            }
+                            .buttonStyle(.bordered)
+
+                            Button("Save") {
+                                addCategory()
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                    }
+                    .padding(20)
+                    .navigationTitle("Add Category")
+                    .navigationBarTitleDisplayMode(.inline)
+                }
+                .presentationDetents([.height(220)])
             }
             .sheet(isPresented: $isShowingDateFilterSheet) {
                 NavigationStack {
@@ -384,6 +424,23 @@ struct HomeView: View {
     private func refreshCategories() {
         expenseDates = ExpenseStore.expenseDatesWithItems()
         categories = ExpenseStore.loadCategories(for: selectedFilterDate)
+    }
+
+    private func addCategory() {
+        let trimmedName = newCategoryName.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !trimmedName.isEmpty else {
+            alertMessage = "Category name cannot be empty."
+            return
+        }
+
+        do {
+            try ExpenseStore.addCategory(named: trimmedName)
+            isShowingAddCategorySheet = false
+            refreshCategories()
+        } catch {
+            alertMessage = "Failed to add the category."
+        }
     }
 
     private func dayTextColor(for day: CalendarDay) -> Color {

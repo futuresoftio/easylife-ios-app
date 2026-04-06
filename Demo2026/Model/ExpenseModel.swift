@@ -97,6 +97,18 @@ enum ExpenseStore {
         return categories(from: expenses(for: date))
     }
 
+    static func addCategory(named name: String) throws {
+        seedInitialDataIfNeeded()
+
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else {
+            return
+        }
+
+        _ = categoryObject(named: trimmedName)
+        try saveContext()
+    }
+
     static func preloadInitialData() {
         seedInitialDataIfNeeded()
     }
