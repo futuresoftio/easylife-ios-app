@@ -31,13 +31,14 @@ enum TrainingScriptError: LocalizedError {
 
 let defaultInputPath = "Demo2026/Data/ReceiptCategoryTrainingTemplate.csv"
 let defaultOutputPath = "Demo2026/Models/ReceiptCategoryClassifier.mlmodel"
+let labelSeparator = "__"
 
 func makeConfiguration(from arguments: [String]) throws -> TrainingConfiguration {
     var inputPath = defaultInputPath
     var outputPath = defaultOutputPath
     var author = "Wei Lin"
     var version = "1.0"
-    var modelDescription = "Receipt item category classifier"
+    var modelDescription = "Receipt item category classifier with hierarchical major and subcategory labels"
 
     var iterator = arguments.makeIterator()
     while let argument = iterator.next() {
@@ -123,20 +124,24 @@ func loadTrainingRows(from fileURL: URL) throws -> DataFrame {
 
     for line in lines.dropFirst() {
         let fields = parseCSVLine(line)
-        guard fields.count == 2 else {
+        guard fields.count == 3 else {
             throw NSError(domain: "TrainingScript", code: 2, userInfo: [
                 NSLocalizedDescriptionKey: "Invalid CSV row: \(line)"
             ])
         }
 
         texts.append(fields[0])
-        labels.append(fields[1])
+        labels.append(makeCombinedLabel(majorLabel: fields[1], subLabel: fields[2]))
     }
 
     var dataFrame = DataFrame()
     dataFrame.append(column: Column(name: "text", contents: texts))
     dataFrame.append(column: Column(name: "label", contents: labels))
     return dataFrame
+}
+
+func makeCombinedLabel(majorLabel: String, subLabel: String) -> String {
+    "\(majorLabel)\(labelSeparator)\(subLabel)"
 }
 
 func parseCSVLine(_ line: String) -> [String] {

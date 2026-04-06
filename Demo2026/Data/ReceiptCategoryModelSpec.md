@@ -4,18 +4,19 @@ Use a bundled Create ML text classifier model named `ReceiptCategoryClassifier.m
 
 ## Training Data Format
 
-Train the model from a CSV file with exactly two columns:
+Train the model from a CSV file with exactly three columns:
 
 ```csv
-text,label
-"flat white coffee","Food"
-"uber trip airport","Transport"
+text,major_label,sub_label
+"flat white coffee","Food","Coffee"
+"BP Calingford","Bills","BP"
 ```
 
 - `text`: OCR-normalized receipt item text, lowercase is fine.
-- `label`: one of the app's supported categories.
+- `major_label`: one of the app's supported top-level categories.
+- `sub_label`: a merchant or finer-grained category used to disambiguate within the major category.
 
-Supported labels:
+Supported major labels:
 
 - `Food`
 - `Transport`
@@ -33,9 +34,22 @@ Supported labels:
 ## Model Input and Output
 
 The bundled model is expected to be a Natural Language text classifier that works with `NLModel`.
+Because `NLModel` is single-output, the training script combines the two labels into one hierarchical label string during training:
+
+```text
+<major_label>__<sub_label>
+```
+
+Example:
+
+```text
+Bills__BP
+```
 
 - Input: a single `String` receipt item text.
-- Output: a predicted label string and label probabilities.
+- Output: a predicted hierarchical label string and label probabilities.
+
+In app code, the existing category flow should continue to use the major category by splitting the predicted label on `__`.
 
 In app code:
 
@@ -48,6 +62,7 @@ In app code:
 - Include OCR noise variants such as `cofee`, `uberbv`, `supa market`.
 - Add an `Other` class for lines that do not fit a known category.
 - Keep labels balanced to avoid overpredicting common classes like `Food`.
+- Add multiple examples per subcategory if you expect to use the subcategory downstream.
 
 ## App Flow
 
@@ -78,5 +93,5 @@ Optional arguments:
   --output Demo2026/Models/ReceiptCategoryClassifier.mlmodel \
   --author "Wei Lin" \
   --version "1.0" \
-  --description "Receipt item category classifier"
+  --description "Receipt item category classifier with hierarchical major and subcategory labels"
 ```

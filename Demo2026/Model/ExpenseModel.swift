@@ -837,21 +837,31 @@ enum ReceiptAnalyzer {
 
 private enum ReceiptCategoryModelLoader {
     private static let modelName = "ReceiptCategoryClassifier"
+    private static let labelSeparator = "__"
     private static let minimumConfidence = 0.55
     private static let supportedCategories = Set(ReceiptAnalyzer.categoryOptions)
     private static let model: NLModel? = loadModel()
 
     static func predictedCategory(for text: String) -> String? {
         let normalizedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let topHypothesis = model?.predictedLabelHypotheses(for: normalizedText, maximumCount: 1).max(by: { $0.value < $1.value })
+        let majorCategory = topHypothesis.map { extractMajorCategory(from: $0.key) }
+
         guard !normalizedText.isEmpty,
-              let model,
-              let topHypothesis = model.predictedLabelHypotheses(for: normalizedText, maximumCount: 1).max(by: { $0.value < $1.value }),
-              supportedCategories.contains(topHypothesis.key),
+              model != nil,
+              let topHypothesis,
+              let majorCategory,
+              supportedCategories.contains(majorCategory),
               topHypothesis.value >= minimumConfidence else {
             return nil
         }
 
-        return topHypothesis.key
+        return majorCategory
+    }
+
+    private static func extractMajorCategory(from label: String) -> String {
+        let components = label.components(separatedBy: labelSeparator)
+        return components.first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? label
     }
 
     private static func loadModel() -> NLModel? {
