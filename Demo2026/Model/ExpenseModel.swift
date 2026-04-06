@@ -97,6 +97,11 @@ enum ExpenseStore {
         return categories(from: expenses(for: date))
     }
 
+    static func loadCategoryNames() -> [String] {
+        seedInitialDataIfNeeded()
+        return fetchCategoryNames()
+    }
+
     static func addCategory(named name: String) throws {
         seedInitialDataIfNeeded()
 
@@ -106,6 +111,29 @@ enum ExpenseStore {
         }
 
         _ = categoryObject(named: trimmedName)
+        try saveContext()
+    }
+
+    static func addExpense(
+        title: String,
+        amount: Double,
+        category: String,
+        createdAt: Date
+    ) throws {
+        seedInitialDataIfNeeded()
+
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedCategory = category.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty, !trimmedCategory.isEmpty else {
+            return
+        }
+
+        insertExpense(
+            title: trimmedTitle,
+            amount: amount,
+            category: trimmedCategory,
+            createdAt: createdAt
+        )
         try saveContext()
     }
 
@@ -370,6 +398,21 @@ enum ExpenseStore {
 
     private static func categoryFetchRequest() -> NSFetchRequest<NSManagedObject> {
         NSFetchRequest<NSManagedObject>(entityName: "Category")
+    }
+
+    private static func fetchCategoryNames() -> [String] {
+        let request = categoryFetchRequest()
+        request.sortDescriptors = [
+            NSSortDescriptor(key: "name", ascending: true)
+        ]
+
+        let storedNames = ((try? viewContext.fetch(request)) ?? [])
+            .compactMap { $0.value(forKey: "name") as? String }
+        let expenseNames = fetchStoredExpenses()
+            .map(expenseCategory(for:))
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+        return Array(Set(storedNames + expenseNames)).sorted()
     }
 }
 

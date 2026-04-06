@@ -18,13 +18,20 @@ struct HomeView: View {
     }
 
     @State private var categories: [ExpenseCategory] = []
+    @State private var categoryNames: [String] = []
+    @State private var expenseFormCategoryNames: [String] = []
     @State private var isShowingAddOptions = false
     @State private var isShowingAddCategorySheet = false
+    @State private var isShowingAddExpenseSheet = false
     @State private var isShowingDateFilterSheet = false
     @State private var isShowingScanner = false
     @State private var isProcessingReceipt = false
     @State private var alertMessage: String?
     @State private var newCategoryName = ""
+    @State private var selectedExpenseCategory = ""
+    @State private var newExpenseTitle = ""
+    @State private var newExpenseAmount = ""
+    @State private var newExpenseDate = Date()
     @State private var selectedFilterDate = Date()
     @State private var pendingFilterDate = Date()
     @State private var calendarMonth = Calendar.current.startOfMonth(for: Date())
@@ -235,7 +242,8 @@ struct HomeView: View {
 
                     Button("Add new expense") {
                         isShowingAddOptions = false
-                        alertMessage = "Add new expense is not implemented yet."
+                        prepareAddExpenseForm()
+                        isShowingAddExpenseSheet = true
                     }
                     .buttonStyle(.bordered)
                     .frame(maxWidth: .infinity)
@@ -276,6 +284,54 @@ struct HomeView: View {
                     .navigationBarTitleDisplayMode(.inline)
                 }
                 .presentationDetents([.height(220)])
+            }
+            .sheet(isPresented: $isShowingAddExpenseSheet) {
+                NavigationStack {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Picker("Category", selection: $selectedExpenseCategory) {
+                            ForEach(expenseFormCategoryNames, id: \.self) { categoryName in
+                                Text(categoryName).tag(categoryName)
+                            }
+                        }
+                        .pickerStyle(.menu)
+
+                        TextField("Expense title", text: $newExpenseTitle)
+                            .textFieldStyle(.roundedBorder)
+
+                        TextField("Expense amount", text: $newExpenseAmount)
+                            .keyboardType(.decimalPad)
+                            .textFieldStyle(.roundedBorder)
+
+                        DatePicker(
+                            "Date",
+                            selection: $newExpenseDate,
+                            displayedComponents: .date
+                        )
+                        .datePickerStyle(.compact)
+
+                        Spacer()
+
+                        HStack {
+                            Button("Cancel", role: .cancel) {
+                                isShowingAddExpenseSheet = false
+                            }
+                            .buttonStyle(.bordered)
+
+                            Button("Save") {
+                                addExpense()
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                    }
+                    .padding(20)
+                    .navigationTitle("Add Expense")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .task {
+                        loadExpenseFormCategories()
+                    }
+                }
+                .presentationDetents([.height(320)])
             }
             .sheet(isPresented: $isShowingDateFilterSheet) {
                 NavigationStack {
@@ -423,6 +479,7 @@ struct HomeView: View {
 
     private func refreshCategories() {
         expenseDates = ExpenseStore.expenseDatesWithItems()
+        categoryNames = ExpenseStore.loadCategoryNames()
         categories = ExpenseStore.loadCategories(for: selectedFilterDate)
     }
 
@@ -440,6 +497,61 @@ struct HomeView: View {
             refreshCategories()
         } catch {
             alertMessage = "Failed to add the category."
+        }
+    }
+
+    private func prepareAddExpenseForm() {
+        expenseFormCategoryNames = []
+        selectedExpenseCategory = ""
+        newExpenseTitle = ""
+        newExpenseAmount = ""
+        newExpenseDate = selectedFilterDate
+    }
+
+    private func addExpense() {
+        let trimmedTitle = newExpenseTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !selectedExpenseCategory.isEmpty else {
+            alertMessage = "Please select a category."
+            return
+        }
+
+        guard !trimmedTitle.isEmpty else {
+            alertMessage = "Expense title cannot be empty."
+            return
+        }
+
+        guard let amount = Double(newExpenseAmount), amount >= 0 else {
+            alertMessage = "Expense amount must be a valid number."
+            return
+        }
+
+        do {
+            try ExpenseStore.addExpense(
+                title: trimmedTitle,
+                amount: amount,
+                category: selectedExpenseCategory,
+                createdAt: newExpenseDate
+            )
+            isShowingAddExpenseSheet = false
+            selectedFilterDate = newExpenseDate
+            refreshCategories()
+        } catch {
+            alertMessage = "Failed to add the expense."
+        }
+    }
+
+    private func loadExpenseFormCategories() {
+        let allCategoryNames = ExpenseStore.loadCategoryNames()
+        expenseFormCategoryNames = allCategoryNames
+
+        if selectedExpenseCategory.isEmpty {
+            selectedExpenseCategory = allCategoryNames.first ?? ""
+        }
+
+        if allCategoryNames.isEmpty {
+            isShowingAddExpenseSheet = false
+            alertMessage = "Please add a category before adding an expense."
         }
     }
 
