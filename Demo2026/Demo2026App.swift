@@ -6,11 +6,17 @@
 //
 
 import SwiftUI
+#if canImport(GoogleMobileAds)
+import GoogleMobileAds
+#endif
 
 @main
 struct Demo2026App: App {
     init() {
         ExpenseStore.preloadInitialData()
+#if canImport(GoogleMobileAds)
+        MobileAds.shared.start()
+#endif
     }
 
     var body: some Scene {
