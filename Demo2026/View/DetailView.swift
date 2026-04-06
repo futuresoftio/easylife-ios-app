@@ -15,6 +15,7 @@ struct DetailView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var isShowingEditSheet = false
+    @State private var isShowingDeleteConfirmation = false
     @State private var selectedCategory: String
     @State private var expenseTitle: String
     @State private var expensePrice: String
@@ -73,8 +74,7 @@ struct DetailView: View {
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Button(role: .destructive) {
-                    onDelete()
-                    dismiss()
+                    isShowingDeleteConfirmation = true
                 } label: {
                     Image(systemName: "trash")
                 }
@@ -125,6 +125,18 @@ struct DetailView: View {
                 .navigationBarTitleDisplayMode(.inline)
             }
             .presentationDetents([.medium])
+        }
+        .alert("Delete Expense", isPresented: $isShowingDeleteConfirmation) {
+            Button("Cancel", role: .cancel) {
+                isShowingDeleteConfirmation = false
+            }
+
+            Button("Delete", role: .destructive) {
+                onDelete()
+                dismiss()
+            }
+        } message: {
+            Text("Are you sure you want to delete this expense? This action cannot be undone.")
         }
         .alert("Edit Expense", isPresented: Binding(
             get: { alertMessage != nil },
