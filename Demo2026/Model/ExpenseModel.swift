@@ -544,7 +544,15 @@ enum ExpenseBackupExporter {
 
         for category in categories {
             for expense in category.expenses {
-                rows.append(xmlRow(category: category.name, item: expense.title, amount: expense.amount, row: rowIndex))
+                rows.append(
+                    xmlRow(
+                        category: category.name,
+                        item: expense.title,
+                        amount: expense.amount,
+                        date: expense.createdAt,
+                        row: rowIndex
+                    )
+                )
                 rowIndex += 1
             }
         }
@@ -565,16 +573,18 @@ enum ExpenseBackupExporter {
             \(inlineStringCell(reference: "A1", value: "Category"))
             \(inlineStringCell(reference: "B1", value: "Item"))
             \(inlineStringCell(reference: "C1", value: "Amount"))
+            \(inlineStringCell(reference: "D1", value: "Date"))
         </row>
         """
     }
 
-    private static func xmlRow(category: String, item: String, amount: Double, row: Int) -> String {
+    private static func xmlRow(category: String, item: String, amount: Double, date: Date, row: Int) -> String {
         """
         <row r="\(row)">
             \(inlineStringCell(reference: "A\(row)", value: category))
             \(inlineStringCell(reference: "B\(row)", value: item))
             <c r="C\(row)"><v>\(String(format: "%.2f", amount))</v></c>
+            \(inlineStringCell(reference: "D\(row)", value: exportedDateString(from: date)))
         </row>
         """
     }
@@ -596,6 +606,12 @@ enum ExpenseBackupExporter {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyyMMdd-HHmmss"
         return formatter.string(from: Date())
+    }
+
+    private static func exportedDateString(from date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
     }
 
     private struct ZIPFile {
