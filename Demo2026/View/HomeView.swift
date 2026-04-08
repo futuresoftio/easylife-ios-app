@@ -202,7 +202,7 @@ struct HomeView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        if VNDocumentCameraViewController.isSupported {
+                        if UIImagePickerController.isSourceTypeAvailable(.camera) {
                             isShowingScanner = true
                         } else {
                             alertMessage = "Receipt scanning is not supported on this device."

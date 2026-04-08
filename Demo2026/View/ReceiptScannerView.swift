@@ -7,7 +7,6 @@
 
 import SwiftUI
 import UIKit
-import VisionKit
 
 struct ReceiptScannerView: UIViewControllerRepresentable {
     let onScan: ([UIImage]) -> Void
@@ -18,16 +17,20 @@ struct ReceiptScannerView: UIViewControllerRepresentable {
         Coordinator(onScan: onScan, onCancel: onCancel, onError: onError)
     }
 
-    func makeUIViewController(context: Context) -> VNDocumentCameraViewController {
-        let controller = VNDocumentCameraViewController()
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let controller = UIImagePickerController()
         controller.delegate = context.coordinator
+        controller.sourceType = .camera
+        controller.cameraCaptureMode = .photo
+        controller.allowsEditing = false
+        controller.modalPresentationStyle = .fullScreen
         return controller
     }
 
-    func updateUIViewController(_ uiViewController: VNDocumentCameraViewController, context: Context) {
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {
     }
 
-    final class Coordinator: NSObject, VNDocumentCameraViewControllerDelegate {
+    final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
         private let onScan: ([UIImage]) -> Void
         private let onCancel: () -> Void
         private let onError: (Error) -> Void
@@ -38,17 +41,25 @@ struct ReceiptScannerView: UIViewControllerRepresentable {
             self.onError = onError
         }
 
-        func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFinishWith scan: VNDocumentCameraScan) {
-            let images = (0..<scan.pageCount).map(scan.imageOfPage(at:))
-            onScan(images)
-        }
+        func imagePickerController(
+            _ picker: UIImagePickerController,
+            didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
+        ) {
+            if let image = info[.originalImage] as? UIImage {
+                onScan([image])
+                return
+            }
 
-        func documentCameraViewControllerDidCancel(_ controller: VNDocumentCameraViewController) {
-            onCancel()
-        }
-
-        func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFailWithError error: Error) {
+            let error = NSError(
+                domain: "ReceiptScannerView",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "The captured receipt image could not be read."]
+            )
             onError(error)
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            onCancel()
         }
     }
 }
