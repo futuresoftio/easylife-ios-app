@@ -146,7 +146,8 @@ enum ExpenseStore {
             insertExpense(
                 title: receiptExpense.item.title,
                 amount: receiptExpense.item.amount,
-                category: receiptExpense.category
+                category: receiptExpense.category,
+                createdAt: receiptExpense.item.createdAt
             )
         }
 
@@ -857,4 +858,3 @@ enum ReceiptCategoryModelLoader {
         return try? NLModel(contentsOf: compiledURL)
     }
 }
-

@@ -101,33 +101,43 @@ enum ReceiptAnalyzer {
     }
 
     private static func parseDate(from lines: [String]) -> Date? {
-        let patterns = [
-            #"\b\d{4}[/-]\d{1,2}[/-]\d{1,2}\b"#,
-            #"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b"#,
-            #"\b\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4}\b"#,
-            #"\b[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{2,4}\b"#
-        ]
+        let labeledLines = lines.filter(isStrictReceiptDateLine)
 
+        if let parsedLabeledDate = parseDate(fromCandidateLines: labeledLines) {
+            return parsedLabeledDate
+        }
+
+        return parseDate(fromCandidateLines: lines)
+    }
+
+    private static func parseDate(fromCandidateLines lines: [String]) -> Date? {
         for line in lines {
-            for pattern in patterns {
-                guard let regex = try? NSRegularExpression(pattern: pattern) else {
-                    continue
-                }
+            let normalizedLine = normalizedDateLine(line)
 
-                let range = NSRange(line.startIndex..<line.endIndex, in: line)
-                guard let match = regex.firstMatch(in: line, range: range),
-                      let matchRange = Range(match.range, in: line) else {
-                    continue
-                }
+            if let parsedDate = parsedDate(from: normalizedLine) {
+                return parsedDate
+            }
 
-                let candidate = String(line[matchRange])
+            for candidate in dateCandidates(in: normalizedLine) {
                 if let parsedDate = parsedDate(from: candidate) {
                     return parsedDate
                 }
             }
+
+            if let detectedDate = detectedDate(in: normalizedLine) {
+                return detectedDate
+            }
         }
 
         return nil
+    }
+
+    private static func isStrictReceiptDateLine(_ text: String) -> Bool {
+        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedText.range(
+            of: #"(?i)^date\s*/\s*time\b"#,
+            options: .regularExpression
+        ) != nil
     }
 
     private static func amount(in line: String) -> Double? {
@@ -146,9 +156,14 @@ enum ReceiptAnalyzer {
     }
 
     private static func parsedDate(from text: String) -> Date? {
-        let formatters = receiptDateFormatters
-        for formatter in formatters {
-            if let parsedDate = formatter.date(from: text) {
+        let normalizedText = text
+            .replacingOccurrences(of: ".", with: "/")
+            .replacingOccurrences(of: ",", with: " ")
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet.alphanumerics.inverted.union(.whitespacesAndNewlines))
+
+        for formatter in receiptDateFormatters {
+            if let parsedDate = formatter.date(from: normalizedText) {
                 return parsedDate
             }
         }
@@ -156,15 +171,84 @@ enum ReceiptAnalyzer {
         return nil
     }
 
+    private static func normalizedDateLine(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "(?i)date\\s*/\\s*time", with: "", options: .regularExpression)
+            .replacingOccurrences(of: "(?i)date\\s*:", with: "", options: .regularExpression)
+            .replacingOccurrences(of: "(?i)time\\s*:", with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func detectedDate(in text: String) -> Date? {
+        guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.date.rawValue) else {
+            return nil
+        }
+
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        return detector.matches(in: text, range: range).compactMap(\.date).first
+    }
+
+    private static func dateCandidates(in text: String) -> [String] {
+        let patterns = [
+            #"\b\d{1,2}[/-\.]\d{1,2}[/-\.]\d{2,4}\s+\d{1,2}:\d{2}\b"#,
+            #"\b\d{4}[/-\.]\d{1,2}[/-\.]\d{1,2}\s+\d{1,2}:\d{2}\b"#,
+            #"\b\d{4}[/-\.]\d{1,2}[/-\.]\d{1,2}\b"#,
+            #"\b\d{1,2}[/-\.]\d{1,2}[/-\.]\d{2,4}\b"#,
+            #"\b\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4}\b"#,
+            #"\b[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{2,4}\b"#
+        ]
+
+        var candidates: [String] = []
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+
+        for pattern in patterns {
+            guard let regex = try? NSRegularExpression(pattern: pattern) else {
+                continue
+            }
+
+            for match in regex.matches(in: text, range: range) {
+                guard let matchRange = Range(match.range, in: text) else {
+                    continue
+                }
+                candidates.append(String(text[matchRange]))
+            }
+        }
+
+        return candidates
+    }
+
     private static let receiptDateFormatters: [DateFormatter] = [
+        "d/M/yy HH:mm",
+        "dd/MM/yy HH:mm",
+        "d/M/yyyy HH:mm",
+        "dd/MM/yyyy HH:mm",
+        "M/d/yy HH:mm",
+        "MM/dd/yy HH:mm",
+        "M/d/yyyy HH:mm",
+        "MM/dd/yyyy HH:mm",
+        "yyyy/M/d HH:mm",
+        "yyyy/MM/dd HH:mm",
+        "yyyy-MM-dd HH:mm",
+        "d-M-yy HH:mm",
+        "dd-MM-yy HH:mm",
+        "d-M-yyyy HH:mm",
+        "dd-MM-yyyy HH:mm",
         "yyyy-MM-dd",
         "yyyy/M/d",
+        "yyyy/MM/dd",
         "d/M/yyyy",
         "dd/MM/yyyy",
+        "M/d/yyyy",
+        "MM/dd/yyyy",
         "d-MM-yyyy",
         "dd-MM-yyyy",
+        "M-d-yyyy",
+        "MM-dd-yyyy",
         "d/M/yy",
         "dd/MM/yy",
+        "M/d/yy",
+        "MM/dd/yy",
         "d MMM yyyy",
         "dd MMM yyyy",
         "d MMMM yyyy",
@@ -178,6 +262,7 @@ enum ReceiptAnalyzer {
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = format
+        formatter.isLenient = false
         return formatter
     }
 }

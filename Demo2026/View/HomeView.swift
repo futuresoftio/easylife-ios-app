@@ -477,6 +477,10 @@ struct HomeView: View {
             }
 
             try ExpenseStore.addReceiptExpenses(receiptExpenses)
+            let parsedReceiptDate = Calendar.current.startOfDay(for: receiptExpenses[0].item.createdAt)
+            selectedFilterDate = parsedReceiptDate
+            pendingFilterDate = parsedReceiptDate
+            calendarMonth = Calendar.current.startOfMonth(for: parsedReceiptDate)
             refreshCategories()
         } catch {
             alertMessage = "Failed to analyze the scanned receipt."
