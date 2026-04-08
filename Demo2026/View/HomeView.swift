@@ -250,11 +250,18 @@ struct HomeView: View {
 
                     Button("Add new expense") {
                         isShowingAddOptions = false
-                        prepareAddExpenseForm()
-                        isShowingAddExpenseSheet = true
+                        handleAddExpenseSelection()
                     }
                     .buttonStyle(.bordered)
                     .frame(maxWidth: .infinity)
+
+                    Text("Tip: Scan a receipt to auto-fill the category.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 8)
 
                     Button("Cancel", role: .cancel) {
                         isShowingAddOptions = false
@@ -489,6 +496,17 @@ struct HomeView: View {
         expenseDates = ExpenseStore.expenseDatesWithItems()
         categoryNames = ExpenseStore.loadCategoryNames()
         categories = ExpenseStore.loadCategories(for: selectedFilterDate)
+    }
+
+    private func handleAddExpenseSelection() {
+        let availableCategories = ExpenseStore.loadCategoryNames()
+        guard !availableCategories.isEmpty else {
+            alertMessage = "Please add a category first, or scan a receipt and let the app parse a category for you."
+            return
+        }
+
+        prepareAddExpenseForm()
+        isShowingAddExpenseSheet = true
     }
 
     private func addCategory() {

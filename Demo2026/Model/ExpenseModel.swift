@@ -81,7 +81,6 @@ private struct ReceiptContext {
 }
 
 enum ExpenseStore {
-    private static let legacySavedExpensesKey = "saved_expense_categories_json"
     private static let persistentContainer: NSPersistentContainer = {
         let container = NSPersistentContainer(name: "ExpenseDataModel")
         container.loadPersistentStores { _, error in
@@ -96,23 +95,18 @@ enum ExpenseStore {
     private static let viewContext = persistentContainer.viewContext
 
     static func loadCategories() -> [ExpenseCategory] {
-        seedInitialDataIfNeeded()
         return categories(from: fetchStoredExpenses())
     }
 
     static func loadCategories(for date: Date) -> [ExpenseCategory] {
-        seedInitialDataIfNeeded()
         return categories(from: expenses(for: date))
     }
 
     static func loadCategoryNames() -> [String] {
-        seedInitialDataIfNeeded()
         return fetchCategoryNames()
     }
 
     static func addCategory(named name: String) throws {
-        seedInitialDataIfNeeded()
-
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else {
             return
@@ -128,8 +122,6 @@ enum ExpenseStore {
         category: String,
         createdAt: Date
     ) throws {
-        seedInitialDataIfNeeded()
-
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedCategory = category.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTitle.isEmpty, !trimmedCategory.isEmpty else {
@@ -146,12 +138,10 @@ enum ExpenseStore {
     }
 
     static func preloadInitialData() {
-        seedInitialDataIfNeeded()
+        // Core Data is now the only storage path.
     }
 
     static func addReceiptExpenses(_ receiptExpenses: [ReceiptExpense]) throws {
-        seedInitialDataIfNeeded()
-
         for receiptExpense in receiptExpenses {
             insertExpense(
                 title: receiptExpense.item.title,
@@ -197,8 +187,6 @@ enum ExpenseStore {
     }
 
     static func loadCategorySummaries(for date: Date) -> [CategoryExpenseSummary] {
-        seedInitialDataIfNeeded()
-
         let filteredExpenses = expenses(for: date)
 
         let groupedTotals = Dictionary(grouping: filteredExpenses, by: { expenseCategory(for: $0) })
@@ -215,8 +203,6 @@ enum ExpenseStore {
     }
 
     static func loadDailyExpenseSummaries(forMonthContaining date: Date) -> [DailyExpenseSummary] {
-        seedInitialDataIfNeeded()
-
         let calendar = Calendar.current
         let monthExpenses = fetchStoredExpenses().filter { expense in
             guard let createdAt = expense.value(forKey: "createdAt") as? Date else {
@@ -244,8 +230,6 @@ enum ExpenseStore {
     }
 
     static func loadExpenseBreakdown(for category: String, date: Date) -> CategoryExpenseBreakdown? {
-        seedInitialDataIfNeeded()
-
         let expenses = expenses(for: date)
             .filter { expense in
                 expenseCategory(for: expense) == category
@@ -280,8 +264,6 @@ enum ExpenseStore {
     }
 
     static func expenseDatesWithItems() -> Set<Date> {
-        seedInitialDataIfNeeded()
-
         let calendar = Calendar.current
         return Set(
             fetchStoredExpenses().compactMap { expense in
@@ -295,8 +277,6 @@ enum ExpenseStore {
     }
 
     static func importExcelFile(from url: URL) throws {
-        seedInitialDataIfNeeded()
-
         let importedExpenses = try ExpenseSpreadsheetImporter.importExpenses(from: url)
         let calendar = Calendar.current
         let importedDays = Set(importedExpenses.map { calendar.startOfDay(for: $0.createdAt) })
@@ -348,36 +328,6 @@ enum ExpenseStore {
         }
     }
 
-    private static func seedInitialDataIfNeeded() {
-        let request = storedExpenseFetchRequest()
-        request.fetchLimit = 1
-
-        let count = (try? viewContext.count(for: request)) ?? 0
-        guard count == 0 else {
-            return
-        }
-
-        let categoriesToSeed = loadLegacySavedCategories().flatMap { categories in
-            categories.isEmpty ? nil : categories
-        } ?? loadBundledCategories()
-        let now = Date()
-
-        for (categoryIndex, category) in categoriesToSeed.enumerated() {
-            for (expenseIndex, expense) in category.expenses.enumerated() {
-                insertExpense(
-                    id: expense.id,
-                    title: expense.title,
-                    amount: expense.amount,
-                    category: category.name,
-                    createdAt: now.addingTimeInterval(Double(categoryIndex * 100 + expenseIndex))
-                )
-            }
-        }
-
-        try? saveContext()
-        UserDefaults.standard.removeObject(forKey: legacySavedExpensesKey)
-    }
-
     private static func insertExpense(
         id: UUID = UUID(),
         title: String,
@@ -408,25 +358,6 @@ enum ExpenseStore {
             viewContext.rollback()
             throw error
         }
-    }
-
-    private static func loadBundledCategories() -> [ExpenseCategory] {
-        guard let url = Bundle.main.url(forResource: "Expense", withExtension: "json"),
-              let data = try? Data(contentsOf: url),
-              let categories = try? JSONDecoder().decode([ExpenseCategory].self, from: data) else {
-            return []
-        }
-
-        return categories
-    }
-
-    private static func loadLegacySavedCategories() -> [ExpenseCategory]? {
-        guard let data = UserDefaults.standard.data(forKey: legacySavedExpensesKey),
-              let categories = try? JSONDecoder().decode([ExpenseCategory].self, from: data) else {
-            return nil
-        }
-
-        return categories
     }
 
     private static func storedExpenseFetchRequest() -> NSFetchRequest<NSManagedObject> {
@@ -870,248 +801,47 @@ private extension Data {
     }
 }
 
-enum ReceiptAnalyzer {
-    static func analyze(images: [UIImage]) async throws -> [ReceiptExpense] {
-        try await Task.detached(priority: .userInitiated) {
-            try images.flatMap(recognizedTextLines(from:))
-        }
-        .value
-        .pipe(parseExpenses)
+enum ReceiptCategoryModelLoader {
+    struct Prediction {
+        let majorCategory: String
+        let subCategory: String?
     }
 
-    private static func recognizedTextLines(from image: UIImage) throws -> [String] {
-        guard let cgImage = image.cgImage else {
-            return []
-        }
-
-        let request = VNRecognizeTextRequest()
-        request.recognitionLevel = .accurate
-        request.usesLanguageCorrection = true
-        request.recognitionLanguages = ["en-AU", "en-US"]
-
-        let handler = VNImageRequestHandler(cgImage: cgImage)
-        try handler.perform([request])
-
-        let observations = request.results ?? []
-        return observations.compactMap { $0.topCandidates(1).first?.string }
-    }
-
-    private static func parseExpenses(from lines: [String]) -> [ReceiptExpense] {
-        let skippedTerms = ["total", "subtotal", "tax", "gst", "change", "balance", "visa", "eftpos", "mastercard", "receipt", "invoice", "amount due"]
-        var parsedExpenses: [ReceiptExpense] = []
-        var fallbackExpense: ReceiptExpense?
-        var previousDescriptiveLine: String?
-        var lastRecognizedContext: ReceiptContext?
-
-        for rawLine in lines {
-            let line = rawLine
-                .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-
-            guard !line.isEmpty else {
-                continue
-            }
-
-            let lowercaseLine = line.lowercased()
-
-            guard let amount = amount(in: line) else {
-                if shouldStoreAsContextLine(line, skippedTerms: skippedTerms) {
-                    previousDescriptiveLine = line
-
-                    let recognizedCategory = ReceiptCategoryModelLoader.predictedCategory(for: line) ?? category(for: line)
-                    if recognizedCategory != "Other" {
-                        lastRecognizedContext = ReceiptContext(title: line, category: recognizedCategory)
-                    }
-                }
-                continue
-            }
-
-            let rawTitle = titleText(in: line)
-            let title = resolvedTitle(
-                from: rawTitle,
-                previousLine: previousDescriptiveLine,
-                recognizedContext: lastRecognizedContext
-            )
-
-            if skippedTerms.contains(where: lowercaseLine.contains) {
-                if lowercaseLine.contains("total"), fallbackExpense == nil {
-                    fallbackExpense = ReceiptExpense(
-                        category: "Other",
-                        item: ExpenseItem(title: "Scanned Receipt", amount: amount)
-                    )
-                }
-                continue
-            }
-
-            guard !title.isEmpty else {
-                continue
-            }
-
-            parsedExpenses.append(
-                ReceiptExpense(
-                    category: resolvedCategory(
-                        for: title,
-                        rawTitle: rawTitle,
-                        recognizedContext: lastRecognizedContext
-                    ),
-                    item: ExpenseItem(title: title, amount: amount)
-                )
-            )
-        }
-
-        if parsedExpenses.isEmpty, let fallbackExpense {
-            return [fallbackExpense]
-        }
-
-        return parsedExpenses
-    }
-
-    private static func amount(in line: String) -> Double? {
-        let pattern = #"(?i)(?:sale\s+)?(?:aud\s*)?\$?\s*([0-9]+(?:[.,][0-9]{2}))\s*$"#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else {
-            return nil
-        }
-
-        let range = NSRange(line.startIndex..<line.endIndex, in: line)
-        guard let match = regex.firstMatch(in: line, range: range),
-              let amountRange = Range(match.range(at: 1), in: line) else {
-            return nil
-        }
-
-        return Double(line[amountRange].replacingOccurrences(of: ",", with: "."))
-    }
-
-    private static func titleText(in line: String) -> String {
-        let pattern = #"(?i)(?:sale\s+)?(?:aud\s*)?\$?\s*[0-9]+(?:[.,][0-9]{2})\s*$"#
-        let title = line.replacingOccurrences(of: pattern, with: "", options: .regularExpression)
-
-        return title.trimmingCharacters(in: CharacterSet(charactersIn: "-: ").union(.whitespacesAndNewlines))
-    }
-
-    private static func resolvedTitle(from rawTitle: String, previousLine: String?, recognizedContext: ReceiptContext?) -> String {
-        let genericTitles = ["sale", "amount", "aud", "$"]
-        let normalizedTitle = rawTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if !normalizedTitle.isEmpty, !genericTitles.contains(normalizedTitle.lowercased()) {
-            return normalizedTitle
-        }
-
-        if let recognizedContext {
-            return recognizedContext.title.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-
-        return previousLine?.trimmingCharacters(in: .whitespacesAndNewlines) ?? normalizedTitle
-    }
-
-    private static func resolvedCategory(for title: String, rawTitle: String, recognizedContext: ReceiptContext?) -> String {
-        let genericTitles = ["sale", "amount", "aud", "$"]
-        let normalizedRawTitle = rawTitle.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-
-        if genericTitles.contains(normalizedRawTitle), let recognizedContext {
-            return recognizedContext.category
-        }
-
-        if let modelCategory = ReceiptCategoryModelLoader.predictedCategory(for: title) {
-            return modelCategory
-        }
-
-        let inferredCategory = category(for: title)
-        if inferredCategory != "Other" {
-            return inferredCategory
-        }
-
-        return recognizedContext?.category ?? inferredCategory
-    }
-
-    private static func shouldStoreAsContextLine(_ line: String, skippedTerms: [String]) -> Bool {
-        let lowercaseLine = line.lowercased()
-
-        if skippedTerms.contains(where: lowercaseLine.contains) {
-            return false
-        }
-
-        return amount(in: line) == nil
-    }
-
-    private static func category(for title: String) -> String {
-        let lowercaseTitle = title.lowercased()
-
-        let categoryKeywords: [(String, [String])] = [
-            ("Food", ["coffee", "lunch", "dinner", "tea", "cafe", "restaurant", "snack", "breakfast"]),
-            ("Transport", ["uber", "taxi", "train", "fare", "metro", "bus", "fuel", "parking", "toll"]),
-            ("Groceries", ["grocery", "fruit", "vegetable", "veg", "milk", "bread", "supermarket", "market"]),
-            ("Entertainment", ["movie", "cinema", "netflix", "game", "music", "ticket"]),
-            ("Health", ["pharmacy", "medicine", "clinic", "dentist", "hospital", "vitamin"]),
-            ("Shopping", ["shirt", "shoes", "clothes", "bag", "gift", "store", "retail"]),
-            ("Bills", ["bill", "electricity", "water", "gas", "internet", "mobile", "recharge", "subscription"]),
-            ("Education", ["book", "course", "tuition", "school", "class"]),
-            ("Personal Care", ["haircut", "salon", "shampoo", "skincare", "soap"]),
-            ("Home", ["dish", "laundry", "detergent", "cleaner", "furniture", "kitchen", "home"]),
-            ("Car service", ["bob jane", "castle hill", "car service", "mechanic", "tyre", "tire", "wheel alignment", "brake"])
-        ]
-
-        for (category, keywords) in categoryKeywords where keywords.contains(where: lowercaseTitle.contains) {
-            return category
-        }
-
-        return "Other"
-    }
-
-    fileprivate static let categoryOptions = [
-        "Food",
-        "Transport",
-        "Groceries",
-        "Entertainment",
-        "Health",
-        "Shopping",
-        "Bills",
-        "Education",
-        "Personal Care",
-        "Home",
-        "Car service",
-        "Other"
-    ]
-
-    fileprivate static func fallbackCategory(for category: String, title: String) -> String {
-        if categoryOptions.contains(category) {
-            return category
-        }
-
-        if let predictedCategory = ReceiptCategoryModelLoader.predictedCategory(for: title) {
-            return predictedCategory
-        }
-
-        return Self.category(for: title)
-    }
-}
-
-private enum ReceiptCategoryModelLoader {
     private static let modelName = "ReceiptCategoryClassifier"
     private static let labelSeparator = "__"
-    private static let minimumConfidence = 0.55
-    private static let supportedCategories = Set(ReceiptAnalyzer.categoryOptions)
+    private static let minimumConfidence = 0.5
     private static let model: NLModel? = loadModel()
 
     static func predictedCategory(for text: String) -> String? {
+        predictedResult(for: text)?.majorCategory
+    }
+
+    static func predictedResult(for text: String) -> Prediction? {
         let normalizedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let topHypothesis = model?.predictedLabelHypotheses(for: normalizedText, maximumCount: 1).max(by: { $0.value < $1.value })
-        let majorCategory = topHypothesis.map { extractMajorCategory(from: $0.key) }
+        let prediction = topHypothesis.map { extractPrediction(from: $0.key) }
 
         guard !normalizedText.isEmpty,
               model != nil,
               let topHypothesis,
-              let majorCategory,
-              supportedCategories.contains(majorCategory),
+              let prediction,
+              prediction.majorCategory != "Other",
               topHypothesis.value >= minimumConfidence else {
             return nil
         }
 
-        return majorCategory
+        return prediction
     }
 
-    private static func extractMajorCategory(from label: String) -> String {
+    private static func extractPrediction(from label: String) -> Prediction {
         let components = label.components(separatedBy: labelSeparator)
-        return components.first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? label
+        let majorCategory = components.first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? label
+        let subCategory = components.dropFirst().first?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return Prediction(
+            majorCategory: majorCategory,
+            subCategory: subCategory?.isEmpty == false ? subCategory : nil
+        )
     }
 
     private static func loadModel() -> NLModel? {
@@ -1128,8 +858,3 @@ private enum ReceiptCategoryModelLoader {
     }
 }
 
-private extension Array where Element == String {
-    func pipe<T>(_ transform: ([String]) -> T) -> T {
-        transform(self)
-    }
-}
