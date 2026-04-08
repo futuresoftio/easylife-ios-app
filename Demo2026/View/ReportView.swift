@@ -20,6 +20,7 @@ struct ReportView: View {
     }
 
     @State private var dailySummaries: [DailyExpenseSummary] = []
+    @State private var categorySummaries: [CategoryExpenseSummary] = []
     @State private var selectedDate = Date()
     @State private var sharedBackupFile: SharedBackupFile?
     @State private var isShowingImportPicker = false
@@ -90,6 +91,38 @@ struct ReportView: View {
         }
     }
 
+    @ViewBuilder
+    private var categoryChartSection: some View {
+        if categorySummaries.isEmpty {
+            EmptyView()
+        } else {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Expense by Category")
+                    .font(.headline)
+                    .padding(.horizontal, 20)
+
+                Chart(categorySummaries) { summary in
+                    BarMark(
+                        x: .value("Category", summary.category),
+                        y: .value("Expense", summary.totalExpense)
+                    )
+                    .foregroundStyle(.green.gradient)
+                }
+                .chartXAxis {
+                    AxisMarks(values: categorySummaries.map(\.category)) { value in
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel()
+                    }
+                }
+                .chartXAxisLabel("Category")
+                .chartYAxisLabel("Expense")
+                .frame(height: 260)
+                .padding(.horizontal, 20)
+            }
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -136,6 +169,7 @@ struct ReportView: View {
                 .padding(.horizontal, 20)
 
                 chartSection
+                categoryChartSection
             }
         }
         .id(layoutRefreshID)
@@ -216,6 +250,7 @@ struct ReportView: View {
 
     private func refreshDailySummaries() {
         dailySummaries = ExpenseStore.loadDailyExpenseSummaries(forMonthContaining: selectedDate)
+        categorySummaries = ExpenseStore.loadMonthlyCategorySummaries(forMonthContaining: selectedDate)
     }
 
     private func dayLabel(for date: Date) -> String {

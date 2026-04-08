@@ -203,6 +203,30 @@ enum ExpenseStore {
         return groupedTotals.sorted { $0.category < $1.category }
     }
 
+    static func loadMonthlyCategorySummaries(forMonthContaining date: Date) -> [CategoryExpenseSummary] {
+        let calendar = Calendar.current
+        let monthExpenses = fetchStoredExpenses().filter { expense in
+            guard let createdAt = expense.value(forKey: "createdAt") as? Date else {
+                return false
+            }
+
+            return calendar.isDate(createdAt, equalTo: date, toGranularity: .month)
+                && calendar.isDate(createdAt, equalTo: date, toGranularity: .year)
+        }
+
+        let groupedTotals = Dictionary(grouping: monthExpenses, by: { expenseCategory(for: $0) })
+            .map { category, expenses in
+                CategoryExpenseSummary(
+                    category: category,
+                    totalExpense: expenses.reduce(0) { partialResult, expense in
+                        partialResult + (expense.value(forKey: "amount") as? Double ?? 0)
+                    }
+                )
+            }
+
+        return groupedTotals.sorted { $0.category < $1.category }
+    }
+
     static func loadDailyExpenseSummaries(forMonthContaining date: Date) -> [DailyExpenseSummary] {
         let calendar = Calendar.current
         let monthExpenses = fetchStoredExpenses().filter { expense in
