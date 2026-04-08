@@ -184,6 +184,14 @@ struct HomeView: View {
             }
             .navigationTitle("Easy Life")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    NavigationLink {
+                        LicensesView()
+                    } label: {
+                        Image(systemName: "doc.text")
+                    }
+                    .accessibilityLabel("Open Licenses")
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         isShowingAddOptions = true
